@@ -1,0 +1,104 @@
+[Results summary]
+ |-Results in .\bayes
+ |-Showing 10 best trials
+ |-Objective(name='binary_accuracy', direction='max')
+[Trial summary]
+ |-Trial ID: 482cc4fbc4066b5d11c094a0757576cd
+ |-Score: 0.7748109102249146
+ |-Best step: 0
+ > Hyperparameters:
+ |-beta_1: 0.9059719801642703
+ |-beta_2: 0.9864585479114847
+ |-epsilon: 1.489866082670701e-07
+ |-learning_rate: 0.0004420969762714228
+ |-network_depth: 5
+[Trial summary]
+ |-Trial ID: 79df30e69e5c703e1f4112b668b44b1f
+ |-Score: 0.7745668292045593
+ |-Best step: 0
+ > Hyperparameters:
+ |-beta_1: 0.8100010199683112
+ |-beta_2: 0.8235062208742803
+ |-epsilon: 1.9488260747760947e-07
+ |-learning_rate: 0.0002669837577945019
+ |-network_depth: 4
+[Trial summary]
+ |-Trial ID: b56ae735ce0d311f9e4d0d5c56c3ccc7
+ |-Score: 0.7693935036659241
+ |-Best step: 0
+ > Hyperparameters:
+ |-beta_1: 0.8000000000000002
+ |-beta_2: 0.8899184470810737
+ |-epsilon: 1.193466265093464e-07
+ |-learning_rate: 0.0002293979049017324
+ |-network_depth: 4
+[Trial summary]
+ |-Trial ID: 8937315ca7e6674323511de951f1a225
+ |-Score: 0.7651370167732239
+ |-Best step: 0
+ > Hyperparameters:
+ |-beta_1: 0.9109279603581015
+ |-beta_2: 0.9984677008314706
+ |-epsilon: 9.332571571775918e-07
+ |-learning_rate: 0.00024749536212769277
+ |-network_depth: 5
+[Trial summary]
+ |-Trial ID: 4a66dd8722b67ba1d9ca39e50e24b2f5
+ |-Score: 0.7606837749481201
+ |-Best step: 0
+ > Hyperparameters:
+ |-beta_1: 0.8494395883339116
+ |-beta_2: 0.8290733526253742
+ |-epsilon: 9.999999999999998e-08
+ |-learning_rate: 0.00035712735031767927
+ |-network_depth: 4
+[Trial summary]
+ |-Trial ID: ba35965deb4e3a5f93391641b122c17d
+ |-Score: 0.7571915984153748
+ |-Best step: 0
+ > Hyperparameters:
+ |-beta_1: 0.8222666684144048
+ |-beta_2: 0.8000000000000002
+ |-epsilon: 9.999999999999998e-08
+ |-learning_rate: 0.0004299694409100099
+ |-network_depth: 4
+[Trial summary]
+ |-Trial ID: 981a75d4682a18871d29abdc356007af
+ |-Score: 0.7571011185646057
+ |-Best step: 0
+ > Hyperparameters:
+ |-beta_1: 0.906257209825916
+ |-beta_2: 0.8984081670329492
+ |-epsilon: 9.999999999999998e-08
+ |-learning_rate: 0.00022781351641141317
+ |-network_depth: 4
+[Trial summary]
+ |-Trial ID: f9d000530330b1b26f79f450c1c2ccf9
+ |-Score: 0.7552091479301453
+ |-Best step: 0
+ > Hyperparameters:
+ |-beta_1: 0.8147536727738025
+ |-beta_2: 0.8541328312796167
+ |-epsilon: 9.999999999999998e-08
+ |-learning_rate: 0.00021890989376507203
+ |-network_depth: 4
+[Trial summary]
+ |-Trial ID: 0b99801061e8811b09b2766098d36d42
+ |-Score: 0.754173755645752
+ |-Best step: 0
+ > Hyperparameters:
+ |-beta_1: 0.8312880696774783
+ |-beta_2: 0.9171372341838486
+ |-epsilon: 3.882575769122501e-07
+ |-learning_rate: 0.00040379594832194217
+ |-network_depth: 5
+[Trial summary]
+ |-Trial ID: 86d38f9b0d1c1cc20ed2d291b0680009
+ |-Score: 0.752248227596283
+ |-Best step: 0
+ > Hyperparameters:
+ |-beta_1: 0.8615452208721123
+ |-beta_2: 0.8718329541814256
+ |-epsilon: 9.999999999999998e-08
+ |-learning_rate: 0.00023588642542776892
+ |-network_depth: 4
