@@ -117,11 +117,12 @@ things to do if I had spare cloud compute.  But in the end, this works quite
 well and is *much* faster than training all 2 million examples.
 """
 #reduce_lr = tf.keras.callbacks.ReduceLROnPlateau(monitor='binary_accuracy', factor=0.5,min_delta=.005,patience=5)
-for i in range(10):
-	model.fit(X_train_short, y_train_short, epochs=100, batch_size=512,callbacks=[tensorboard_callback],verbose=0)
+model.load_weights("weights_small")
+for i in range(30):
+	model.fit(X_train_short, y_train_short, epochs=200, batch_size=512,callbacks=[tensorboard_callback],verbose=0)
 	results = model.evaluate(X_test, y_test, batch_size=128)
 	print("test loss: %f, test acc: %s" % tuple(results))
-	model.fit(X_train, y_train, epochs=5, batch_size=512,callbacks=[tensorboard_callback,],verbose=0)
+	model.fit(X_train, y_train, epochs=2, batch_size=512,callbacks=[tensorboard_callback,],verbose=0)
 	results = model.evaluate(X_test, y_test, batch_size=128)
 	print("test loss: %f, test acc: %s" % tuple(results))
-model.save_weights("weights_small")
+model.save_weights("weights_small2")
