@@ -77,6 +77,9 @@ I didn't have much success with non relu activations (vanishing gradient problem
 and although it would make more sense for the final layer to be constrained to (0,1)
 that didn't seem to work very well either.
 """
+def fastLoss(y_true,y_pred)
+	s = tf.math.abs(y_true-y_pred)
+	return tf.math.reduce_logsumexp(s)
 def build_model(hp):
 	LOSS="mse"
 	model = Sequential()
@@ -104,10 +107,8 @@ tensorboard_callback = keras.callbacks.TensorBoard(log_dir=log_dir, histogram_fr
 
 tuner = kt.tuners.bayesian.BayesianOptimization(build_model,'binary_accuracy',200,project_name="bayesfortruncatedset")
 tuner.search(X_train_short, y_train_short,batch_size=256,verbose=0,epochs=50,validation_data=(X_test,y_test),callbacks=[stopEarly,tensorboard_callback])
-tuner.results_summary()
-best_hps = tuner.get_best_hyperparameters(num_trials = 5)[4]
+best_hps = tuner.get_best_hyperparameters(num_trials = 2)[1]
 model = tuner.hypermodel.build(best_hps)
-model.summary()
 """
 Annealing process: several cycles on the same model on training on a subset
 of the data, then all of the data.  I didn't have any success getting it to
@@ -117,12 +118,13 @@ things to do if I had spare cloud compute.  But in the end, this works quite
 well and is *much* faster than training all 2 million examples.
 """
 #reduce_lr = tf.keras.callbacks.ReduceLROnPlateau(monitor='binary_accuracy', factor=0.5,min_delta=.005,patience=5)
-model.load_weights("weights_small")
-for i in range(30):
+model.load_weights("weights_small_1")
+for i in range(2,10):
 	model.fit(X_train_short, y_train_short, epochs=200, batch_size=512,callbacks=[tensorboard_callback],verbose=0)
 	results = model.evaluate(X_test, y_test, batch_size=128)
 	print("test loss: %f, test acc: %s" % tuple(results))
-	model.fit(X_train, y_train, epochs=2, batch_size=512,callbacks=[tensorboard_callback,],verbose=0)
+	model.fit(X_train, y_train, epochs=4, batch_size=1024,callbacks=[tensorboard_callback,],verbose=0)
 	results = model.evaluate(X_test, y_test, batch_size=128)
 	print("test loss: %f, test acc: %s" % tuple(results))
-model.save_weights("weights_small2")
+	model.save_weights("weights_small_"+str(i))
+model.save_weights("weights_small_done")
