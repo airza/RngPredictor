@@ -114,12 +114,11 @@ batch sizes or different HPs than the smaller subset.  Those would be good
 things to do if I had spare cloud compute.  But in the end, this works quite
 well and is *much* faster than training all 2 million examples.
 """
-
-for i in range(4):
-	model.fit(X_train_short, y_train_short, epochs=50, batch_size=512,callbacks=[tensorboard_callback],verbose=0)
-	results = model.evaluate(X_test, y_test, batch_size=128)
-	print("test loss: %f, test acc: %s" % tuple(results))
-	model.fit(X_train, y_train, epochs=10, batch_size=512,callbacks=[tensorboard_callback,stopEarly],verbose=0)
-	results = model.evaluate(X_test, y_test, batch_size=128)
-	print("test loss: %f, test acc: %s" % tuple(results))
-model.save_weights("weights")
+model.load_weights("weights")
+model.fit(X_train_short, y_train_short, epochs=60, batch_size=512,callbacks=[tensorboard_callback],verbose=0)
+results = model.evaluate(X_test, y_test, batch_size=128)
+print("test loss: %f, test acc: %s" % tuple(results))
+model.fit(X_train, y_train, epochs=6, batch_size=512,callbacks=[tensorboard_callback,stopEarly],verbose=0)
+results = model.evaluate(X_test, y_test, batch_size=128)
+print("test loss: %f, test acc: %s" % tuple(results))
+model.save_weights("perfectweights")
