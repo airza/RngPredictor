@@ -114,7 +114,7 @@ batch sizes or different HPs than the smaller subset.  Those would be good
 things to do if I had spare cloud compute.  But in the end, this works quite
 well and is *much* faster than training all 2 million examples.
 """
-model.load_weights("weights")
+model.load_weights("perfectweights")
 model.fit(X_train_short, y_train_short, epochs=60, batch_size=512,callbacks=[tensorboard_callback],verbose=0)
 results = model.evaluate(X_test, y_test, batch_size=128)
 print("test loss: %f, test acc: %s" % tuple(results))
