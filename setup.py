@@ -33,9 +33,12 @@ def xorshift128plus():
 if __name__ == '__main__':
 	for f in [xorshift128,xorshift128plus]:
 		_file = open(f.__name__+".rng","w")
+		_file2 = open(f.__name__+"_extra.rng","w")
 		rng = f()
 		for i in range(ENOUGH_DATA):
 			_file.write(str(rng())+"\n")
+		for i in range(ENOUGH_DATA):
+			_file2.write(str(rng())+"\n")
 		_file.close()
 		_file = open(f.__name__+"TRUNCATED.rng","w")
 		rng = f()

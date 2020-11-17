@@ -1,10 +1,10 @@
 import tensorflow as tf
 from extractor import get_data_from_file
-IMPORT_COUNT = 3999000
-TEST_COUNT = 20000
+IMPORT_COUNT = 1000000
+TEST_COUNT = 1000000
 RNG_NAME="xorshift128"
 
-X,y=get_data_from_file(RNG_NAME+'.rng',IMPORT_COUNT,2)
+X,y=get_data_from_file(RNG_NAME+'_extra.rng',IMPORT_COUNT,4)
 
 X_train = X[TEST_COUNT:]
 X_test = X[:TEST_COUNT]
