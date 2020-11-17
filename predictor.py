@@ -4,6 +4,7 @@ import kerastuner as kt
 from tensorflow import keras
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, LSTM
+from tensorflow.keras.experimental import PeepholeLSTMCell
 import datetime
 
 IMPORT_COUNT = 3990000
@@ -49,9 +50,8 @@ df_as_frames=df_as_frames[indicies]
 #Now is the correct time if you want to narrow the RNG prediction to specific bits
 #which is probably a much easier problem (e.g.)
 # y = df_as_frames[:,-1,:][:,_INSERT_MASK_HERE_]
-y = df_as_frames[:,-1,:]
+y = df_as_frames[:,-1,:].astype('float64')
 X = df_as_frames[:,:-1,]
-
 """
 Default model assumes that you want to use an LSTM to learn underlying
 state about the representation. There is some reason to beleive that
@@ -77,37 +77,34 @@ I didn't have much success with non relu activations (vanishing gradient problem
 and although it would make more sense for the final layer to be constrained to (0,1)
 that didn't seem to work very well either.
 """
-def fastLoss(y_true,y_pred)
-	s = tf.math.abs(y_true-y_pred)
+def fastLoss(y_true,y_pred):
+	s = 10*tf.math.abs(y_true-y_pred)
 	return tf.math.reduce_logsumexp(s)
 def build_model(hp):
 	LOSS="mse"
 	model = Sequential()
-	width = hp.Int("network_width",64,512,sampling="log")
-	model.add(LSTM(units=width*2,activation='relu',input_shape=(PREVIOUS_TIMESTEP_COUNT,BIT_WIDTH,),return_sequences=False,))
-	for depth in range(hp.Int("network_depth", 4,8)):
+	width = hp.Int("network_width",64,256,sampling="log")
+	model.add(LSTM(units=width*3,activation='relu',input_shape=(PREVIOUS_TIMESTEP_COUNT,BIT_WIDTH,),return_sequences=False,))
+	for depth in range(6):
 		model.add(Dense(width,activation='relu'))
 	model.add(Dense(y.shape[1],activation='sigmoid'))
 	opt = keras.optimizers.Nadam(
-		learning_rate=hp.Float("learning_rate", 10**(-2), 10**(-6),sampling="log"),
+		learning_rate=hp.Float("learning_rate", 10**(-1), 10**(-7),sampling="log"),
 		epsilon=1e-7,
 		beta_1=.9,
 		beta_2=.9,
 		)
-	model.compile(optimizer=opt, loss=LOSS,metrics=['binary_accuracy'])
+	model.compile(optimizer=opt, loss=fastLoss,metrics=['binary_accuracy'])
 	return model
-X_train_short= X_train[:600000]
-y_train_short= y_train[:600000]
-#define CBs
-stopEarly = tf.keras.callbacks.EarlyStopping(
-	monitor='binary_accuracy', min_delta=.001, patience=10, verbose=0, mode='auto', restore_best_weights=False
-)
-log_dir = "hyperparameters_for_truncated/"+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+X_train_short= X_train[:60000]
+y_train_short= y_train[:60000]
+#define CB
+stopEarly = tf.keras.callbacks.EarlyStopping(monitor='binary_accuracy', min_delta=.001, patience=20, verbose=0, mode='auto', restore_best_weights=False)
+log_dir = "logsumpexplog/"+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 tensorboard_callback = keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1,profile_batch=0)
-
-tuner = kt.tuners.bayesian.BayesianOptimization(build_model,'binary_accuracy',200,project_name="bayesfortruncatedset")
-tuner.search(X_train_short, y_train_short,batch_size=256,verbose=0,epochs=50,validation_data=(X_test,y_test),callbacks=[stopEarly,tensorboard_callback])
-best_hps = tuner.get_best_hyperparameters(num_trials = 2)[1]
+tuner = kt.tuners.bayesian.BayesianOptimization(build_model,'binary_accuracy',25,project_name="logsumexp")
+tuner.search(X_train_short, y_train_short,batch_size=256,verbose=0,epochs=100,validation_data=(X_test,y_test),callbacks=[tensorboard_callback])
+best_hps = tuner.get_best_hyperparameters(num_trials = 2)[0]
 model = tuner.hypermodel.build(best_hps)
 """
 Annealing process: several cycles on the same model on training on a subset
@@ -118,12 +115,12 @@ things to do if I had spare cloud compute.  But in the end, this works quite
 well and is *much* faster than training all 2 million examples.
 """
 #reduce_lr = tf.keras.callbacks.ReduceLROnPlateau(monitor='binary_accuracy', factor=0.5,min_delta=.005,patience=5)
-model.load_weights("weights_small_1")
-for i in range(2,10):
-	model.fit(X_train_short, y_train_short, epochs=200, batch_size=512,callbacks=[tensorboard_callback],verbose=0)
+model.load_weights("weights_small_2")
+for i in range(3,10):
+	model.fit(X_train_short, y_train_short, epochs=50, batch_size=256,callbacks=[tensorboard_callback],verbose=0)
 	results = model.evaluate(X_test, y_test, batch_size=128)
 	print("test loss: %f, test acc: %s" % tuple(results))
-	model.fit(X_train, y_train, epochs=4, batch_size=1024,callbacks=[tensorboard_callback,],verbose=0)
+	model.fit(X_train, y_train, epochs=10, batch_size=256,callbacks=[tensorboard_callback,],verbose=0)
 	results = model.evaluate(X_test, y_test, batch_size=128)
 	print("test loss: %f, test acc: %s" % tuple(results))
 	model.save_weights("weights_small_"+str(i))
