@@ -61,7 +61,7 @@ def build_model(hp):
 		beta_1=.9,
 		beta_2=.9,
 		)
-	model.compile(optimizer=opt, loss=fastLoss,metrics=['binary_accuracy'])
+	model.compile(optimizer=opt, loss=hp.Choice('loss_function', values = ['mse',fastLoss,]) ,metrics=['binary_accuracy'])
 	return model
 X_train_short= X_train[:200000]
 y_train_short= y_train[:200000]
@@ -69,8 +69,8 @@ y_train_short= y_train[:200000]
 stopEarly = tf.keras.callbacks.EarlyStopping(monitor='binary_accuracy', min_delta=.001, patience=20, verbose=0, mode='auto', restore_best_weights=False)
 log_dir = "logs/"+RNG_NAME+"_"+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 tensorboard_callback = keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1,profile_batch=0)
-tuner = kt.tuners.bayesian.BayesianOptimization(build_model,'binary_accuracy',50,project_name=RNG_NAME+"_hp_search")
-tuner.search(X_train_short, y_train_short,batch_size=256,verbose=0,epochs=50,validation_data=(X_test,y_test),callbacks=[tensorboard_callback])
+tuner = kt.tuners.bayesian.BayesianOptimization(build_model,'binary_accuracy',100,project_name=RNG_NAME+"_hp_search")
+tuner.search(X_train_short, y_train_short,batch_size=256,verbose=0,epochs=100,validation_data=(X_test,y_test),callbacks=[tensorboard_callback])
 tuner.results_summary()
 best_hps = tuner.get_best_hyperparameters(num_trials = 1)[0]
 model = tuner.hypermodel.build(best_hps)
