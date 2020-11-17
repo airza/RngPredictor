@@ -6,7 +6,7 @@ from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, LSTM
 from tensorflow.keras.experimental import PeepholeLSTMCell
 import datetime
-
+from extractor import get_data_from_file
 IMPORT_COUNT = 3990000
 TEST_COUNT = 20000
 
@@ -17,41 +17,7 @@ If you are not sure, I would suggest
 If your RNG produces low entropy output, you
 may need more past data-but I have no tested this.
 """
-PREVIOUS_TIMESTEP_COUNT = 8
-
-TOTAL_DATA_NUM = IMPORT_COUNT-PREVIOUS_TIMESTEP_COUNT
-
-def strided(a, L):
-	#I don't recommend touching this code.
-	shp = a.shape
-	s  = a.strides
-	nd0 = shp[0]-L+1
-	shp_in = (nd0,L)+shp[1:]
-	strd_in = (s[0],) + s
-	return np.lib.stride_tricks.as_strided(a, shape=shp_in, strides=strd_in)
-
-RNG_OUTPUT_FILENAME="xorshift128TRUNCATED.txt"
-df = np.genfromtxt(RNG_OUTPUT_FILENAME,delimiter='\n',dtype='uint64')[:IMPORT_COUNT]
-#calculates how many bits are in the output.
-BIT_WIDTH=np.ceil(np.log2(np.amax(df))).astype(int)
-
-#We need to transform this from a list of numbers to a list of those numbers
-#binary representation, and then slice it into 1 observed output and
-#PREVIOUS_TIMESTEP_COUNT previous outputs. I also do not recommend touching this code
-#as it is quite fucky.
-df_as_bits =(df[:,None] & (1 << np.arange(BIT_WIDTH,dtype='uint64')) > 0).astype(int)
-df_as_frames = strided(df_as_bits,PREVIOUS_TIMESTEP_COUNT+1)
-
-#normal shuffle doesn't work for some reason, oh well
-indicies = np.arange(TOTAL_DATA_NUM,dtype='uint64')
-np.random.shuffle(indicies)
-df_as_frames=df_as_frames[indicies]
-
-#Now is the correct time if you want to narrow the RNG prediction to specific bits
-#which is probably a much easier problem (e.g.)
-# y = df_as_frames[:,-1,:][:,_INSERT_MASK_HERE_]
-y = df_as_frames[:,-1,:].astype('float64')
-X = df_as_frames[:,:-1,]
+X,y=get_data_from_file('xorshift128.txt',IMPORT_COUNT,4)
 """
 Default model assumes that you want to use an LSTM to learn underlying
 state about the representation. There is some reason to beleive that
@@ -102,10 +68,12 @@ y_train_short= y_train[:60000]
 stopEarly = tf.keras.callbacks.EarlyStopping(monitor='binary_accuracy', min_delta=.001, patience=20, verbose=0, mode='auto', restore_best_weights=False)
 log_dir = "logsumpexplog/"+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 tensorboard_callback = keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1,profile_batch=0)
+"""
 tuner = kt.tuners.bayesian.BayesianOptimization(build_model,'binary_accuracy',25,project_name="logsumexp")
 tuner.search(X_train_short, y_train_short,batch_size=256,verbose=0,epochs=100,validation_data=(X_test,y_test),callbacks=[tensorboard_callback])
 best_hps = tuner.get_best_hyperparameters(num_trials = 2)[0]
 model = tuner.hypermodel.build(best_hps)
+"""
 """
 Annealing process: several cycles on the same model on training on a subset
 of the data, then all of the data.  I didn't have any success getting it to
@@ -117,8 +85,8 @@ well and is *much* faster than training all 2 million examples.
 model= tf.keras.models.load_model("xorshift128")
 results = model.evaluate(X_test, y_test, batch_size=128)
 print("test loss: %f, test acc: %s" % tuple(results))
-model.save("xorshift128")
 #reduce_lr = tf.keras.callbacks.ReduceLROnPlateau(monitor='binary_accuracy', factor=0.5,min_delta=.005,patience=5)
+"""
 for i in range(3,10):
 	model.fit(X_train_short, y_train_short, epochs=50, batch_size=256,callbacks=[tensorboard_callback],verbose=0)
 	results = model.evaluate(X_test, y_test, batch_size=128)
@@ -128,3 +96,4 @@ for i in range(3,10):
 	print("test loss: %f, test acc: %s" % tuple(results))
 	model.save_weights("weights_small_"+str(i))
 model.save_weights("weights_small_done")
+"""

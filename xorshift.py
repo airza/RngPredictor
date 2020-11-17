@@ -23,7 +23,7 @@ def main():
     r = xorshift128()
 
     for i in range(4000000):
-        n = (r() & 0xFFFF0000)>>16
+        n = r()
         _ = x.write(str(n)+'\n')
 
 
