@@ -43,6 +43,7 @@ I didn't have much success with non relu activations (vanishing gradient problem
 and although it would make more sense for the final layer to be constrained to (0,1)
 that didn't seem to work very well either.
 """
+print(X.shape)
 def fastLoss(y_true,y_pred):
 	s = 10*tf.math.abs(y_true-y_pred)
 	return tf.math.reduce_logsumexp(s)
@@ -50,7 +51,7 @@ def build_model(hp):
 	LOSS="mse"
 	model = Sequential()
 	width = hp.Int("network_width",64,256,sampling="log")
-	model.add(LSTM(units=width*3,activation='relu',input_shape=(PREVIOUS_TIMESTEP_COUNT,BIT_WIDTH,),return_sequences=False,))
+	model.add(LSTM(units=width*3,activation='relu',input_shape=(X.shape[1],X.shape[2]),return_sequences=False,))
 	for depth in range(6):
 		model.add(Dense(width,activation='relu'))
 	model.add(Dense(y.shape[1],activation='sigmoid'))
@@ -66,7 +67,7 @@ X_train_short= X_train[:200000]
 y_train_short= y_train[:200000]
 #define CB
 stopEarly = tf.keras.callbacks.EarlyStopping(monitor='binary_accuracy', min_delta=.001, patience=20, verbose=0, mode='auto', restore_best_weights=False)
-log_dir = RNG_NAME+"_"+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+log_dir = "logs/"+RNG_NAME+"_"+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 tensorboard_callback = keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1,profile_batch=0)
 tuner = kt.tuners.bayesian.BayesianOptimization(build_model,'binary_accuracy',50,project_name=RNG_NAME+"_hp_search")
 tuner.search(X_train_short, y_train_short,batch_size=256,verbose=0,epochs=50,validation_data=(X_test,y_test),callbacks=[tensorboard_callback])

@@ -1,5 +1,5 @@
-bayes*
-hyperparameters*
+logs*
 checkpoint
 *.rng
 __pycache__
+*_hp_search

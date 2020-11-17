@@ -8,7 +8,6 @@ def strided(a, L):
 	strd_in = (s[0],) + s
 	return np.lib.stride_tricks.as_strided(a, shape=shp_in, strides=strd_in)
 def get_data_from_file(filename,total_data_count,previous_timestep_count):
-	previous_timestep_count = 4
 	TOTAL_DATA_NUM = total_data_count-previous_timestep_count
 	df = np.genfromtxt(filename,delimiter='\n',dtype='uint64')[:total_data_count]
 	#calculates how many bits are in the output.
