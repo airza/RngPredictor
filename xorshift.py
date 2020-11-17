@@ -19,11 +19,12 @@ def xorshift128():
 
 
 def main():
-    x = open('xorshift128.txt','w')
+    x = open('xorshift128TRUNCATED.txt','w')
     r = xorshift128()
 
     for i in range(4000000):
-        _ = x.write(str(r())+'\n')
+        n = (r() & 0xFFFF0000)>>16
+        _ = x.write(str(n)+'\n')
 
 
 if __name__ == '__main__':
