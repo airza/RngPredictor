@@ -55,9 +55,8 @@ def build_model(hp):
 	model = Sequential()
 	width = hp.Int("network_width",128,512,sampling="log")
 	model.add(LSTM(units=width*3,activation='relu',input_shape=(X.shape[1],X.shape[2]),return_sequences=False,))
-	for depth in range(hp.Int("network_width",6,12,sampling="log")):
+	for depth in range(hp.Int("network_depth",6,12,sampling="log")):
 		model.add(Dense(width,activation='relu'))
-		if depth%3==0:
 	model.add(Dense(y.shape[1],activation='sigmoid'))
 	opt = keras.optimizers.Nadam(
 		learning_rate=hp.Float("learning_rate", 10**(-1), 10**(-7),sampling="log"),
