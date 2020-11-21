@@ -3,11 +3,11 @@ import tensorflow as tf
 import kerastuner as kt
 from tensorflow import keras
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense, LSTM
+from tensorflow.keras.layers import Dense, LSTM, LayerNormalization
 from tensorflow.keras.experimental import PeepholeLSTMCell
 import datetime
 from extractor import get_data_from_file
-IMPORT_COUNT = 1999000
+IMPORT_COUNT = 2999000
 TEST_COUNT = 20000
 RNG_NAME="xorshift128plus"
 """
@@ -46,21 +46,24 @@ that didn't seem to work very well either.
 """
 print(X.shape)
 print(y.shape)
-exit(0)
 def fastLoss(y_true,y_pred):
 	s = 10*tf.math.abs(y_true-y_pred)
 	return tf.math.reduce_logsumexp(s)
 def build_model(hp):
 	LOSS="mse"
 	model = Sequential()
-	width = hp.Int("network_width",128,512,sampling="log")
-	model.add(LSTM(units=width*3,activation='relu',input_shape=(X.shape[1],X.shape[2]),return_sequences=False,))
-	for depth in range(hp.Int("network_depth",6,12,sampling="log")):
+	#width = hp.Int("network_width",128,512,sampling="log")
+	width= hp.Int("network_width",64,128)
+	model.add(LSTM(units=64,recurrent_activation='relu',input_shape=(X.shape[1],X.shape[2]),return_sequences=True,))
+	model.add(LSTM(units=width,return_sequences=False,))
+	for depth in range(hp.Int("network_depth",2,8)):
 		model.add(Dense(width,activation='relu'))
+		if depth%3==2:
+			model.add(LayerNormalization())
 	model.add(Dense(y.shape[1],activation='sigmoid'))
 	opt = keras.optimizers.Nadam(
-		learning_rate=hp.Float("learning_rate", 10**(-1), 10**(-7),sampling="log"),
-		epsilon=1e-7,
+		learning_rate=hp.Float("learning_rate", 10**(-8),10**(4),sampling="log"),
+		epsilon=1e-8,
 		beta_1=.9,
 		beta_2=.9,
 		)
@@ -72,11 +75,12 @@ y_train_short= y_train[:600000]
 stopEarly = tf.keras.callbacks.EarlyStopping(monitor='binary_accuracy', min_delta=.001, patience=20, verbose=0, mode='auto', restore_best_weights=False)
 log_dir = "logs/"+RNG_NAME+"_"+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 tensorboard_callback = keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1,profile_batch=0)
-tuner = kt.tuners.bayesian.BayesianOptimization(build_model,'binary_accuracy',40,project_name=RNG_NAME+"_hp_search")
-#tuner.search(X_train_short, y_train_short,batch_size=256,verbose=0,epochs=100,validation_data=(X_test,y_test),callbacks=[tensorboard_callback])
+tuner = kt.tuners.bayesian.BayesianOptimization(build_model,'binary_accuracy',100,project_name=RNG_NAME+"_hp_search")
+#tuner.search(X_train_short, y_train_short,batch_size=256,verbose=0,epochs=50,validation_data=(X_test,y_test),callbacks=[tensorboard_callback])
 tuner.results_summary()
-best_hps = tuner.get_best_hyperparameters(num_trials = 1)[0]
+best_hps = tuner.get_best_hyperparameters(num_trials = 5)[-1]
 model = tuner.hypermodel.build(best_hps)
+model.summary()
 """
 Annealing process: several cycles on the same model on training on a subset
 of the data, then all of the data.  I didn't have any success getting it to

@@ -1,4 +1,4 @@
-ENOUGH_DATA=4000000
+ENOUGH_DATA=8000000
 def xorshift128():
     '''xorshift
     https://ja.wikipedia.org/wiki/Xorshift
