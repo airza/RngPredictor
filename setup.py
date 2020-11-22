@@ -30,6 +30,13 @@ def xorshift128plus():
         generated = (x+y) & MAXSIZE
         return generated
     return _rand
+def sequence():
+    s = 0
+    def _rand():
+        nonlocal s
+        s+=1
+        return s
+    return _rand
 if __name__ == '__main__':
 	for f in [xorshift128,xorshift128plus]:
 		_file = open(f.__name__+".rng","w")
