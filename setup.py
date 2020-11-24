@@ -1,4 +1,4 @@
-ENOUGH_DATA=8000000
+ENOUGH_DATA=4000000
 def xorshift128():
     '''xorshift
     https://ja.wikipedia.org/wiki/Xorshift
@@ -38,13 +38,13 @@ def sequence():
         return s
     return _rand
 if __name__ == '__main__':
-	for f in [xorshift128,xorshift128plus]:
+	for f in [xorshift128plus]:
 		_file = open(f.__name__+".rng","w")
 		_file2 = open(f.__name__+"_extra.rng","w")
 		rng = f()
 		for i in range(ENOUGH_DATA):
 			_file.write(str(rng())+"\n")
-		for i in range(ENOUGH_DATA):
+		for i in range(2*ENOUGH_DATA):
 			_file2.write(str(rng())+"\n")
 		_file.close()
 		_file = open(f.__name__+"TRUNCATED.rng","w")

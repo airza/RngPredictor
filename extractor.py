@@ -27,3 +27,4 @@ def get_data_from_file(filename,total_data_count,previous_timestep_count):
 	# y = df_as_frames[:,-1,:][:,_INSERT_MASK_HERE_]
 	y = df_as_frames[:,-1,:]
 	X = df_as_frames[:,:-1,]
+	return (X,y)

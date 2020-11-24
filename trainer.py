@@ -3,12 +3,12 @@ import tensorflow as tf
 import kerastuner as kt
 from tensorflow import keras
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense, LSTM, LayerNormalization,BatchNormalization
+from tensorflow.keras.layers import Dense, LSTM, Dropout, BatchNormalization
 import datetime
 from extractor import get_data_from_file
-IMPORT_COUNT = 2999000
+IMPORT_COUNT = 2000000
 TEST_COUNT = 20000
-RNG_NAME="xorshift128plus"
+RNG_NAME="xorshift128"
 """
 Control how many outputs back the model should look.
 If you are not sure, I would suggest
@@ -16,7 +16,7 @@ If you are not sure, I would suggest
 If your RNG produces low entropy output, you
 may need more past data-but I have no tested this.
 """
-X,y=get_data_from_file(RNG_NAME+'.rng',IMPORT_COUNT,2)
+X,y=get_data_from_file(RNG_NAME+'_extra.rng',IMPORT_COUNT,2)
 """
 Default model assumes that you want to use an LSTM to learn underlying
 state about the representation. There is some reason to beleive that
@@ -26,6 +26,9 @@ np.reshape(X,[TOTAL_DATA_NUM,-1])
 so for example x goes from a (TOTAL_DATA_NUM,32,4) tensor to a
 (TOTAL_DATA_NUM,32*4) tensor
 """
+print(X.shape)
+X = np.reshape(X,[X.shape[0],-1])
+print(X.shape)
 X_train = X[TEST_COUNT:]
 X_test = X[:TEST_COUNT]
 y_train = y[TEST_COUNT:]
@@ -42,38 +45,36 @@ I didn't have much success with non relu activations (vanishing gradient problem
 and although it would make more sense for the final layer to be constrained to (0,1)
 that didn't seem to work very well either.
 """
-print(X.shape)
-print(y.shape)
 def fastLoss(y_true,y_pred):
 	s = 3*tf.math.abs(y_true-y_pred)
 	return tf.math.reduce_logsumexp(s)
 def build_model(hp):
 	LOSS="mse"
 	model = Sequential()
-	width= 512
-	model.add(BatchNormalization(input_shape=(X.shape[1],X.shape[2])))
-	model.add(Dense(width,activation="relu",))
-	model.add(LSTM(units=512,activation='relu',recurrent_activation='relu',return_sequences=False,))
-	for depth in range(hp.Int("depth",2,7)):
-		model.add(Dense(width,activation='relu'))
+	FAT_WIDTH = hp.Int("fat_width",256,512,sampling="log")
+	THIN_WIDTH = 128 #hp.Choice("thin_width",(32,64,128))
+	DEPTH = hp.Int("depth",1,4)
+	model.add(BatchNormalization(input_shape=(X.shape[1],)))
+	for i in range(DEPTH):
+		model.add(Dense(FAT_WIDTH,activation="relu",))
+		model.add(Dense(FAT_WIDTH,activation="relu",))
+		model.add(Dense(THIN_WIDTH,activation="relu",))
 	model.add(Dense(y.shape[1]))
 	opt = keras.optimizers.Nadam(
-		learning_rate=hp.Float("learning_rate", 10**(-6),.1,sampling="log"),
+		learning_rate=hp.Float("learning_rate", 10**-6,10**-2,sampling="reverse_log"),
 		epsilon=1e-8,
 		beta_1=.9,
 		beta_2=.9,
-		)
+	)
 	model.compile(optimizer=opt, loss=tf.keras.losses.MSE,metrics=['binary_accuracy'])
 	model.summary()
 	return model
-X_train_short= X_train[:600000]
-y_train_short= y_train[:600000]
 #define CB
-stopEarly = tf.keras.callbacks.EarlyStopping(monitor='binary_accuracy', min_delta=.05, patience=15, verbose=0, mode='auto', restore_best_weights=False)
+stopEarly = tf.keras.callbacks.EarlyStopping(monitor='binary_accuracy', min_delta=.03, patience=20, verbose=0, mode='auto', restore_best_weights=False)
 log_dir = "logs/"+RNG_NAME+"_"+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 tensorboard_callback = keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1,profile_batch=0)
-tuner = kt.tuners.bayesian.BayesianOptimization(build_model,'binary_accuracy',200,project_name="hp_search_"+RNG_NAME)
-tuner.search(X_train_short, y_train_short,batch_size=256,verbose=0,epochs=50,validation_data=(X_test,y_test),callbacks=[stopEarly])
+tuner = kt.tuners.bayesian.BayesianOptimization(build_model,'binary_accuracy',100,project_name="hp_search_"+RNG_NAME)
+tuner.search(X_train, y_train,batch_size=256,verbose=0,epochs=50,validation_data=(X_test,y_test),callbacks=[tensorboard_callback,stopEarly])
 tuner.results_summary()
 best_hps = tuner.get_best_hyperparameters(num_trials = 5)[-1]
 model = tuner.hypermodel.build(best_hps)
@@ -86,11 +87,8 @@ batch sizes or different HPs than the smaller subset.  Those would be good
 things to do if I had spare cloud compute.  But in the end, this works quite
 well and is *much* faster than training all 2 million examples.
 """
-for i in range(6):
-	model.fit(X_train_short, y_train_short, epochs=50, batch_size=256,callbacks=[tensorboard_callback],verbose=0)
-	results = model.evaluate(X_test, y_test, batch_size=128)
-	print("test loss: %f, test acc: %s" % tuple(results))
-	model.fit(X_train, y_train, epochs=10, batch_size=256,callbacks=[tensorboard_callback,],verbose=0)
+for i in range(10):
+	model.fit(X_train, y_train, epochs=50, batch_size=512,callbacks=[tensorboard_callback,],verbose=0)
 	results = model.evaluate(X_test, y_test, batch_size=128)
 	print("test loss: %f, test acc: %s" % tuple(results))
 	model.save_weights(RNG_NAME+"_weights_annealing_pass_"+str(i))
