@@ -9,7 +9,7 @@ import datetime
 from extractor import get_data_from_file
 IMPORT_COUNT = 600000
 TEST_COUNT = 20000
-RNG_NAME="sequence"
+RNG_NAME="xorshift128"
 """
 Control how many outputs back the model should look.
 If you are not sure, I would suggest
@@ -17,7 +17,7 @@ If you are not sure, I would suggest
 If your RNG produces low entropy output, you
 may need more past data-but I have no tested this.
 """
-X,y=get_data_from_file(RNG_NAME+'_extra.rng',IMPORT_COUNT,2)
+X,y=get_data_from_file(RNG_NAME+'_extra.rng',IMPORT_COUNT,4)
 """
 Default model assumes that you want to use an LSTM to learn underlying
 state about the representation. There is some reason to beleive that
@@ -49,13 +49,14 @@ that didn't seem to work very well either.
 LOSS="mse"
 inputs = Input(shape=(X.shape[1],))
 queries = Dense(X.shape[1],activation="relu")(inputs)
-mha = MultiHeadAttention(num_heads=4,key_dim=X.shape[1],attention_axes=0)
+queries = Dense(X.shape[1],activation="relu")(queries)
+mha = MultiHeadAttention(num_heads=8,key_dim=X.shape[1],attention_axes=1)
 layer = mha(inputs,queries)
 layer2 = Dense(X.shape[1],activation="relu")(layer)
 output= Dense(y.shape[1])(layer2)
 model = keras.Model(inputs=inputs,outputs=output,name="fuckler")
 opt = keras.optimizers.Nadam(
-	learning_rate=.9,
+	learning_rate=.01,
 	epsilon=1e-8,
 	beta_1=.9,
 	beta_2=.9,
@@ -65,5 +66,5 @@ model.summary()
 #define CB
 log_dir = "logs/"+RNG_NAME+"_"+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 tensorboard_callback = keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1,profile_batch=0)
-model.fit(X_train,y_train,epochs=50, batch_size=512,callbacks=[tensorboard_callback,],verbose=0)
+model.fit(X_train,y_train,epochs=50, batch_size=256,callbacks=[tensorboard_callback,],verbose=0)
 model.save_weights(RNG_NAME+"_DONE")
