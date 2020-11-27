@@ -24,7 +24,8 @@ def get_data_from_file(filename,total_data_count,previous_timestep_count):
 	df_as_frames=df_as_frames[indicies]
 	#Now is the correct time if you want to narrow the RNG prediction to specific bits
 	#which is probably a much easier problem (e.g.)
-	# y = df_as_frames[:,-1,:][:,_INSERT_MASK_HERE_]
-	y = df_as_frames[:,-1,:]
+	y = df_as_frames[:,-1,:][:,:1]
+	print(y.shape)
+	#y = df_as_frames[:,-1,:]
 	X = df_as_frames[:,:-1,]
 	return (X,y)
