@@ -3,7 +3,7 @@ import tensorflow as tf
 import kerastuner as kt
 from tensorflow import keras
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense, MultiHeadAttention,BatchNormalization
+from tensorflow.keras.layers import Dense, MultiHeadAttention,BatchNormalization,ReLU
 from tensorflow.keras import Input
 import datetime
 from extractor import get_data_from_file
@@ -49,33 +49,36 @@ def transformer(layer,num_heads,key_dim):
 	_in =Dense(X.shape[1],activation="relu")(layer)
 	mha = MultiHeadAttention(num_heads=num_heads,key_dim=key_dim,attention_axes=1)
 	res = mha(_in,_in)
+	return tf.keras.layers.ReLU(negative_slope=.01)(layer+res)
 def build_model(hp):
-	focal_size = hp.Int("size",1,2)*X.shape[1]
-	key_width = hp.Int("key_dim",4,128,sampling="log")
-	heads = focal_size//key_width
+	focal_size = hp.Float("size",.25,.5)*X.shape[1]
+	key_width = hp.Int("key_dim",4,32,sampling="log")
+	heads = max(int(focal_size//key_width),2)
 	inputs = Input(shape=(X.shape[1],))
 	t = transformer(inputs,heads,key_width)
-	t_count = hp.Int("t_count",1,3)
+	t_count = hp.Int("t_count",3,4)
 	for i in range(t_count):
 		t = transformer(t,heads,key_width)
-	output= Dense(1)(t)
-	model = keras.Model(inputs=inputs,outputs=output,name="fuckler")
+	outputSize = 1 if len(y.shape)==1 else y.shape[1]
+	output= Dense(outputSize,activation='sigmoid')(t)
+	model =keras.Model(inputs=inputs,outputs=output,name="fuckler")
 	opt = keras.optimizers.Nadam(
-		learning_rate=hp.Float("learning_rate", 10**(-4),10**-3,sampling="log"),
-		epsilon=1e-8,
-		beta_1=.9,
-		beta_2=.9,
+		learning_rate=hp.Float("learning_rate", 10**-4.5,10**-3.5,sampling="log"),
+		epsilon=hp.Float("epsilon",1e-8,1e-5,sampling="log"),
+		beta_1=hp.Float("beta",.5,.999,sampling="reverse_log"),
+		beta_2=hp.Float("beta_2",.9,.999,sampling="reverse_log")
 	)
-	model.compile(optimizer=opt,loss=tf.keras.losses.MSE,metrics=['binary_accuracy'])
+	loss_function = "mse"
+	model.compile(optimizer=opt,loss=loss_function,metrics=['binary_accuracy'])
 	model.summary()
 	return model
+
 log_dir = "logs/"+RNG_NAME+"_"+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 tensorboard_callback = keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=0,write_graph=False,profile_batch=0)
 stop_callback = tf.keras.callbacks.EarlyStopping(
-    monitor='binary_accuracy', min_delta=.01, patience=5)
-
-tuner = kt.tuners.bayesian.BayesianOptimization(build_model,'binary_accuracy',100,project_name="hp_search_"+RNG_NAME)
-tuner.search(X_train, y_train,batch_size=256,verbose=0,epochs=25,validation_data=(X_test,y_test),callbacks=[tensorboard_callback,stop_callback])
+    monitor='binary_accuracy', min_delta=.01, patience=7)
+tuner = kt.tuners.hyperband.Hyperband(build_model, 'binary_accuracy', 40, factor=2, hyperband_iterations=20, seed=None, hyperparameters=None, tune_new_entries=True, allow_new_entries=True, project_name="hp_search_"+RNG_NAME)
+tuner.search(X_train, y_train,batch_size=512,verbose=0,epochs=40,validation_data=(X_test,y_test),callbacks=[tensorboard_callback,stop_callback])
 tuner.results_summary()
 best_hps = tuner.get_best_hyperparameters(num_trials = 5)[-1]
 model = tuner.hypermodel.build(best_hps)
