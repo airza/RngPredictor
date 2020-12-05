@@ -10,6 +10,7 @@ from extractor import get_data_from_file
 IMPORT_COUNT = 1020000
 TEST_COUNT = 20000
 PREV_COUNT = 2
+BIT=0
 RNG_NAME = "xorshift128plus"
 LOSS_FUNCTION ='mse'
 METRIC_FUNCTION = 'binary_accuracy'
@@ -60,7 +61,7 @@ def transformer(layer,num_heads,key_dim):
 	_in =Dense(X.shape[1],activation="relu",bias_initializer=tf.keras.initializers.glorot_uniform)(layer)
 	mha = MultiHeadAttention(num_heads=num_heads,key_dim=key_dim,attention_axes=1,bias_initializer=tf.keras.initializers.glorot_uniform)
 	res = mha(_in,_in)
-	return tf.keras.layers.ReLU(negative_slope=.01)(layer+res)
+	return tf.keras.layers.ReLU(negative_slope=.3)(layer+res)
 def build_model(hp):
 	#model stuff
 	network_size = hp.Float("size",.4,1)*X.shape[1]
@@ -100,12 +101,12 @@ class StopWhenDoneCallback(keras.callbacks.Callback):
     		self.model.stop_training = True
 #tensorboard_callback = keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1,write_graph=False,profile_batch=0)
 tuner = kt.tuners.randomsearch.RandomSearch(build_model,METRIC_FUNCTION,100,project_name="hp_search_"+RNG_NAME)
-tuner.search(X_train, y_train,batch_size=256,verbose=0,epochs=200,validation_data=(X_test,y_test),callbacks=[StopWhenDoneCallback(),tf.keras.callbacks.TerminateOnNaN()])
+tuner.search(X_train, y_train,batch_size=512,verbose=1,epochs=300,validation_data=(X_test,y_test),callbacks=[StopWhenDoneCallback(),tf.keras.callbacks.TerminateOnNaN()])
 tuner.results_summary()
 best_hps = tuner.get_best_hyperparameters(num_trials = 2)[1]
 model = tuner.hypermodel.build(best_hps)
 model.summary()
-model.fit(X_train,y_train,epochs=500, batch_size=256,callbacks=[tensorboard_callback,StopWhenDoneCallback(),LrScheduler],validation_data=(X_test,y_test),verbose=0)
+model.fit(X_train,y_train,epochs=500, batch_size=512,callbacks=[tensorboard_callback,StopWhenDoneCallback(),LrScheduler],validation_data=(X_test,y_test),verbose=0)
 results = model.evaluate(X_test, y_test, batch_size=128)
 print("test loss: %f, test acc: %s" % tuple(results))	
 model.save_weights(RNG_NAME+"_""BIT_%d"%BIT)
