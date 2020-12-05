@@ -7,11 +7,15 @@ from tensorflow.keras.layers import Dense, MultiHeadAttention,BatchNormalization
 from tensorflow.keras import Input
 import datetime
 from extractor import get_data_from_file
-IMPORT_COUNT = 1020000
+IMPORT_COUNT = 600000
 TEST_COUNT = 20000
-PREV_COUNT = 2
+PREV_COUNT = 4
 BIT=0
-RNG_NAME = "xorshift128plus"
+RNG_NAME = "xorshift128"
+if "xorshift128plus" == RNG_NAME:
+	PREV_COUNT = 2
+elif "xorshift128" == RNG_NAME
+	PREV_COUNT = 4
 LOSS_FUNCTION ='mse'
 METRIC_FUNCTION = 'binary_accuracy'
 """
@@ -64,7 +68,7 @@ def transformer(layer,num_heads,key_dim):
 	return tf.keras.layers.ReLU(negative_slope=.3)(layer+res)
 def build_model(hp):
 	#model stuff
-	network_size = hp.Float("size",.4,1)*X.shape[1]
+	network_size = hp.Float("size",.25,.5)*X.shape[1]
 	t_count = hp.Int("t_count",2,6,sampling="log")
 	network_size/=t_count
 	t_count-=1
@@ -83,7 +87,7 @@ def build_model(hp):
 	output = out+.5
 	model =keras.Model(inputs=inputs,outputs=output,name="fuckler")
 	opt = keras.optimizers.Nadam(
-		learning_rate=hp.Float("learning_rate", 10**-6.5,10**-5.0,sampling="log"),
+		learning_rate=hp.Float("learning_rate", 10**-4.5,10**-3,sampling="log"),
 		epsilon= 1e-9,
 		beta_1=hp.Float("beta_1",.1,.99,sampling="reverse_log"),
 		beta_2=hp.Float("beta_2",.1,.99,sampling="reverse_log")
@@ -99,14 +103,14 @@ class StopWhenDoneCallback(keras.callbacks.Callback):
     	accuracy= logs['binary_accuracy']
     	if accuracy>.99:
     		self.model.stop_training = True
-#tensorboard_callback = keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1,write_graph=False,profile_batch=0)
+tensorboard_callback = keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1,write_graph=False,profile_batch=0)
 tuner = kt.tuners.randomsearch.RandomSearch(build_model,METRIC_FUNCTION,100,project_name="hp_search_"+RNG_NAME)
-tuner.search(X_train, y_train,batch_size=512,verbose=1,epochs=300,validation_data=(X_test,y_test),callbacks=[StopWhenDoneCallback(),tf.keras.callbacks.TerminateOnNaN()])
+tuner.search(X_train, y_train,batch_size=512,verbose=0,epochs=20,validation_data=(X_test,y_test),callbacks=[StopWhenDoneCallback(),tf.keras.callbacks.TerminateOnNaN(),tensorboard_callback])
 tuner.results_summary()
 best_hps = tuner.get_best_hyperparameters(num_trials = 2)[1]
 model = tuner.hypermodel.build(best_hps)
 model.summary()
-model.fit(X_train,y_train,epochs=500, batch_size=512,callbacks=[tensorboard_callback,StopWhenDoneCallback(),LrScheduler],validation_data=(X_test,y_test),verbose=0)
+model.fit(X_train, y_train,batch_size=512,verbose=0,epochs=20,validation_data=(X_test,y_test),callbacks=[StopWhenDoneCallback(),tf.keras.callbacks.TerminateOnNaN(),tensorboard_callback])
 results = model.evaluate(X_test, y_test, batch_size=128)
 print("test loss: %f, test acc: %s" % tuple(results))	
 model.save_weights(RNG_NAME+"_""BIT_%d"%BIT)
