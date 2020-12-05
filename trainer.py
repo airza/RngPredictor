@@ -53,19 +53,12 @@ I didn't have much success with non relu activations (vanishing gradient problem
 and although it would make more sense for the final layer to be constrained to (0,1)
 that didn't seem to work very well either.
 """
-def schedule(epoch,lr):
-	if epoch<5:
-		return 10**(-3.2)
-	else:
-		return 10**(-6.466297830785874)
-LrScheduler = tf.keras.callbacks.LearningRateScheduler(
-    schedule, verbose=0
-)
-def transformer(layer,num_heads,key_dim):
-	_in =Dense(X.shape[1],activation="relu",bias_initializer=tf.keras.initializers.glorot_uniform)(layer)
+
+def transformer(layer,num_heads,key_dim,activation='relu'):
+	_in =Dense(X.shape[1],activation=activation,bias_initializer=tf.keras.initializers.glorot_uniform)(layer)
 	mha = MultiHeadAttention(num_heads=num_heads,key_dim=key_dim,attention_axes=1,bias_initializer=tf.keras.initializers.glorot_uniform)
 	res = mha(_in,_in)
-	return tf.keras.layers.ReLU(negative_slope=.3)(layer+res)
+	return tf.keras.layers.ReLU(negative_slope=.01)(layer+res)
 def build_model(hp):
 	#model stuff
 	network_size = hp.Float("size",.25,.5)*X.shape[1]
@@ -76,9 +69,11 @@ def build_model(hp):
 	network_size/=key_width
 	heads = max(int(network_size),1)
 	inputs = Input(shape=(X.shape[1],))
+	leakiness = hp.Float("relu_leakiness",.0001,.1,sampling="log")
+	lrelu = lambda x: tf.keras.activations.relu(x, alpha=leakiness)
 	inputs_1 = inputs*2
 	inputs_2 = inputs_1-1
-	t = transformer(inputs_2,heads,key_width)
+	t = transformer(inputs_2,heads,key_width,lrelu)
 	for i in range(t_count):
 		t = transformer(t,heads,key_width)
 	outputSize = 1 if len(y.shape)==1 else y.shape[1]
