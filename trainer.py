@@ -10,7 +10,6 @@ from extractor import get_data_from_file
 IMPORT_COUNT = 1020000
 TEST_COUNT = 20000
 PREV_COUNT = 2
-BIT=0
 RNG_NAME = "xorshift128plus"
 LOSS_FUNCTION ='mse'
 METRIC_FUNCTION = 'binary_accuracy'
@@ -81,14 +80,11 @@ def build_model(hp):
 	outLayer= Dense(outputSize,bias_initializer=tf.keras.initializers.Constant(value=0))(t)
 	out = outLayer*.5
 	output = out+.5
-
-	#optimizer definition
-	useNes = hp.Choice("nesterov",[True,False])
 	model =keras.Model(inputs=inputs,outputs=output,name="fuckler")
-	opt = tf.keras.optimizers.SGD(
-		momentum=hp.Float("momentum",.1,.99,sampling="reverse_log"),
-		learning_rate=hp.Float("learning_rate", 10**-6.5,10**-2.0,sampling="log"),
-		nesterov= True if useNes else False
+	opt = keras.optimizers.Nadam(
+		learning_rate=hp.Float("learning_rate", 10**-6.5,10**-5.0,sampling="log"),
+		epsilon= 1e-9,
+		beta_2=hp.Float("beta_2",.5001,.9,sampling="reverse_log")
 	)
 	model.compile(optimizer=opt,loss=LOSS_FUNCTION,metrics=[METRIC_FUNCTION])
 	model.summary()
@@ -103,7 +99,7 @@ class StopWhenDoneCallback(keras.callbacks.Callback):
     		self.model.stop_training = True
 #tensorboard_callback = keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1,write_graph=False,profile_batch=0)
 tuner = kt.tuners.randomsearch.RandomSearch(build_model,METRIC_FUNCTION,100,project_name="hp_search_"+RNG_NAME)
-tuner.search(X_train, y_train,batch_size=256,verbose=1,epochs=200,validation_data=(X_test,y_test),callbacks=[StopWhenDoneCallback(),tf.keras.callbacks.TerminateOnNaN()])
+tuner.search(X_train, y_train,batch_size=256,verbose=0,epochs=200,validation_data=(X_test,y_test),callbacks=[StopWhenDoneCallback(),tf.keras.callbacks.TerminateOnNaN()])
 tuner.results_summary()
 best_hps = tuner.get_best_hyperparameters(num_trials = 2)[1]
 model = tuner.hypermodel.build(best_hps)
