@@ -14,7 +14,7 @@ BIT=0
 RNG_NAME = "xorshift128"
 if "xorshift128plus" == RNG_NAME:
 	PREV_COUNT = 2
-elif "xorshift128" == RNG_NAME
+elif "xorshift128" == RNG_NAME:
 	PREV_COUNT = 4
 LOSS_FUNCTION ='mse'
 METRIC_FUNCTION = 'binary_accuracy'
