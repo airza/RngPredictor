@@ -10,6 +10,7 @@ from extractor import get_data_from_file
 IMPORT_COUNT = 1020000
 TEST_COUNT = 20000
 PREV_COUNT = 2
+BIT=0
 RNG_NAME = "xorshift128plus"
 LOSS_FUNCTION ='mse'
 METRIC_FUNCTION = 'binary_accuracy'
@@ -99,7 +100,7 @@ class StopWhenDoneCallback(keras.callbacks.Callback):
     		self.model.stop_training = True
 #tensorboard_callback = keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1,write_graph=False,profile_batch=0)
 tuner = kt.tuners.randomsearch.RandomSearch(build_model,METRIC_FUNCTION,100,project_name="hp_search_"+RNG_NAME)
-tuner.search(X_train, y_train,batch_size=256,verbose=0,epochs=200,validation_data=(X_test,y_test),callbacks=[StopWhenDoneCallback(),tf.keras.callbacks.TerminateOnNaN()])
+tuner.search(X_train, y_train,batch_size=256,verbose=1,epochs=200,validation_data=(X_test,y_test),callbacks=[StopWhenDoneCallback(),tf.keras.callbacks.TerminateOnNaN()])
 tuner.results_summary()
 best_hps = tuner.get_best_hyperparameters(num_trials = 2)[1]
 model = tuner.hypermodel.build(best_hps)
