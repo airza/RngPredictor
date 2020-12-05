@@ -7,10 +7,9 @@ from tensorflow.keras.layers import Dense, MultiHeadAttention,BatchNormalization
 from tensorflow.keras import Input
 import datetime
 from extractor import get_data_from_file
-IMPORT_COUNT = 2000000
+IMPORT_COUNT = 1020000
 TEST_COUNT = 20000
 PREV_COUNT = 2
-TRUNCATED_BITS = 2
 BIT=0
 RNG_NAME = "xorshift128plus"
 LOSS_FUNCTION ='mse'
@@ -64,8 +63,9 @@ def transformer(layer,num_heads,key_dim):
 	res = mha(_in,_in)
 	return tf.keras.layers.ReLU(negative_slope=.01)(layer+res)
 def build_model(hp):
-	network_size = hp.Float("size",.4,.8)*X.shape[1]
-	t_count = 5+hp.Int("t_count",2,6,sampling="log")
+	#model stuff
+	network_size = hp.Float("size",.4,1)*X.shape[1]
+	t_count = hp.Int("t_count",2,6,sampling="log")
 	network_size/=t_count
 	t_count-=1
 	key_width = hp.Int("key_dim",2,32,sampling="log")
@@ -81,11 +81,14 @@ def build_model(hp):
 	outLayer= Dense(outputSize,bias_initializer=tf.keras.initializers.Constant(value=0))(t)
 	out = outLayer*.5
 	output = out+.5
+
+	#optimizer definition
+	useNes = hp.Choice("nesterov",[True,False])
 	model =keras.Model(inputs=inputs,outputs=output,name="fuckler")
-	opt = keras.optimizers.Nadam(
-		learning_rate=hp.Float("learning_rate", 10**-5.5,10**-5.0,sampling="log"),
-		epsilon= 1e-9,
-		beta_2=hp.Float("beta_2",.5001,.9,sampling="reverse_log")
+	opt = tf.keras.optimizers.SGD(
+		momentum=hp.Float("momentum",.1,.99,sampling="reverse_log"),
+		learning_rate=hp.Float("learning_rate", 10**-6.5,10**-2.0,sampling="log"),
+		nesterov= True if useNes else False
 	)
 	model.compile(optimizer=opt,loss=LOSS_FUNCTION,metrics=[METRIC_FUNCTION])
 	model.summary()
@@ -98,9 +101,9 @@ class StopWhenDoneCallback(keras.callbacks.Callback):
     	accuracy= logs['binary_accuracy']
     	if accuracy>.99:
     		self.model.stop_training = True
-tensorboard_callback = keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1,write_graph=False,profile_batch=0)
+#tensorboard_callback = keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1,write_graph=False,profile_batch=0)
 tuner = kt.tuners.randomsearch.RandomSearch(build_model,METRIC_FUNCTION,100,project_name="hp_search_"+RNG_NAME)
-tuner.search(X_train, y_train,batch_size=2048,verbose=0,epochs=200,validation_data=(X_test,y_test),callbacks=[tensorboard_callback,StopWhenDoneCallback()])
+tuner.search(X_train, y_train,batch_size=256,verbose=1,epochs=200,validation_data=(X_test,y_test),callbacks=[StopWhenDoneCallback(),tf.keras.callbacks.TerminateOnNaN()])
 tuner.results_summary()
 best_hps = tuner.get_best_hyperparameters(num_trials = 2)[1]
 model = tuner.hypermodel.build(best_hps)
