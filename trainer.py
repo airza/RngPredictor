@@ -81,14 +81,11 @@ def build_model(hp):
 	outLayer= Dense(outputSize,bias_initializer=tf.keras.initializers.Constant(value=0))(t)
 	out = outLayer*.5
 	output = out+.5
-
-	#optimizer definition
-	useNes = hp.Choice("nesterov",[True,False])
 	model =keras.Model(inputs=inputs,outputs=output,name="fuckler")
-	opt = tf.keras.optimizers.SGD(
-		momentum=hp.Float("momentum",.1,.99,sampling="reverse_log"),
-		learning_rate=hp.Float("learning_rate", 10**-6.5,10**-2.0,sampling="log"),
-		nesterov= True if useNes else False
+	opt = keras.optimizers.Nadam(
+		learning_rate=hp.Float("learning_rate", 10**-6.5,10**-5.0,sampling="log"),
+		epsilon= 1e-9,
+		beta_2=hp.Float("beta_2",.5001,.9,sampling="reverse_log")
 	)
 	model.compile(optimizer=opt,loss=LOSS_FUNCTION,metrics=[METRIC_FUNCTION])
 	model.summary()
