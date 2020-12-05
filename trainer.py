@@ -7,12 +7,12 @@ from tensorflow.keras.layers import Dense, MultiHeadAttention,BatchNormalization
 from tensorflow.keras import Input
 import datetime
 from extractor import get_data_from_file
-IMPORT_COUNT = 600000
+IMPORT_COUNT = 2000000
 TEST_COUNT = 20000
-PREV_COUNT = 5
+PREV_COUNT = 2
 TRUNCATED_BITS = 2
 BIT=0
-RNG_NAME = "xorshift128TRUNCATED_%d" % TRUNCATED_BITS
+RNG_NAME = "xorshift128plus"
 LOSS_FUNCTION ='mse'
 METRIC_FUNCTION = 'binary_accuracy'
 """
@@ -50,36 +50,48 @@ I didn't have much success with non relu activations (vanishing gradient problem
 and although it would make more sense for the final layer to be constrained to (0,1)
 that didn't seem to work very well either.
 """
+def schedule(epoch,lr):
+	if epoch<5:
+		return 10**(-3.2)
+	else:
+		return 10**(-6.466297830785874)
+LrScheduler = tf.keras.callbacks.LearningRateScheduler(
+    schedule, verbose=0
+)
 def transformer(layer,num_heads,key_dim):
 	_in =Dense(X.shape[1],activation="relu",bias_initializer=tf.keras.initializers.glorot_uniform)(layer)
 	mha = MultiHeadAttention(num_heads=num_heads,key_dim=key_dim,attention_axes=1,bias_initializer=tf.keras.initializers.glorot_uniform)
 	res = mha(_in,_in)
 	return tf.keras.layers.ReLU(negative_slope=.01)(layer+res)
 def build_model(hp):
-	network_size = hp.Float("size",.1,.25)*X.shape[1]
-	t_count = hp.Int("t_count",2,6,sampling="log")
+	network_size = hp.Float("size",.4,.8)*X.shape[1]
+	t_count = 5+hp.Int("t_count",2,6,sampling="log")
 	network_size/=t_count
 	t_count-=1
 	key_width = hp.Int("key_dim",2,32,sampling="log")
 	network_size/=key_width
 	heads = max(int(network_size),1)
 	inputs = Input(shape=(X.shape[1],))
-	t = transformer(inputs,heads,key_width)
+	inputs_1 = inputs*2
+	inputs_2 = inputs_1-1
+	t = transformer(inputs_2,heads,key_width)
 	for i in range(t_count):
 		t = transformer(t,heads,key_width)
 	outputSize = 1 if len(y.shape)==1 else y.shape[1]
-	output= Dense(outputSize,activation='sigmoid',bias_initializer=tf.keras.initializers.glorot_uniform)(t)
+	outLayer= Dense(outputSize,bias_initializer=tf.keras.initializers.Constant(value=0))(t)
+	out = outLayer*.5
+	output = out+.5
 	model =keras.Model(inputs=inputs,outputs=output,name="fuckler")
 	opt = keras.optimizers.Nadam(
-		learning_rate=hp.Float("learning_rate", 10**-4.5,10**-3.5,sampling="log"),
-		epsilon= 1e-8,
-		beta_2=hp.Float("beta_2",.5,.9,sampling="reverse_log")
+		learning_rate=hp.Float("learning_rate", 10**-5.5,10**-5.0,sampling="log"),
+		epsilon= 1e-9,
+		beta_2=hp.Float("beta_2",.5001,.9,sampling="reverse_log")
 	)
 	model.compile(optimizer=opt,loss=LOSS_FUNCTION,metrics=[METRIC_FUNCTION])
 	model.summary()
 	return model
 
-log_dir = "logs/"+RNG_NAME+"/BIT_NUM_%d/"%BIT+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+log_dir = "logs/"+RNG_NAME+"/"+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 
 class StopWhenDoneCallback(keras.callbacks.Callback):
     def on_epoch_end(self, epoch, logs=None):
@@ -88,20 +100,12 @@ class StopWhenDoneCallback(keras.callbacks.Callback):
     		self.model.stop_training = True
 tensorboard_callback = keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1,write_graph=False,profile_batch=0)
 tuner = kt.tuners.randomsearch.RandomSearch(build_model,METRIC_FUNCTION,100,project_name="hp_search_"+RNG_NAME)
-tuner.search(X_train, y_train,batch_size=512,verbose=0,epochs=20,validation_data=(X_test,y_test),callbacks=[tensorboard_callback,StopWhenDoneCallback()])
+tuner.search(X_train, y_train,batch_size=2048,verbose=0,epochs=200,validation_data=(X_test,y_test),callbacks=[tensorboard_callback,StopWhenDoneCallback()])
 tuner.results_summary()
-best_hps = tuner.get_best_hyperparameters(num_trials = 5)[-1]
+best_hps = tuner.get_best_hyperparameters(num_trials = 2)[1]
 model = tuner.hypermodel.build(best_hps)
 model.summary()
-"""
-#define CB
-model.load_weights(RNG_NAME+"_"+"DONE")
-for i in range(20):
-	model.fit(X_train,y_train,epochs=5, batch_size=256,callbacks=[tensorboard_callback,],verbose=0)
-	results = model.evaluate(X_test, y_test, batch_size=128)
-	print("test loss: %f, test acc: %s" % tuple(results))	
-	model.save_weights(RNG_NAME+"_"+str(i))
-model.save_weights(RNG_NAME+"_"+"DONE_2")
+model.fit(X_train,y_train,epochs=500, batch_size=256,callbacks=[tensorboard_callback,StopWhenDoneCallback(),LrScheduler],validation_data=(X_test,y_test),verbose=0)
 results = model.evaluate(X_test, y_test, batch_size=128)
-print("test loss: %f, test acc: %s" % tuple(results))
-"""
+print("test loss: %f, test acc: %s" % tuple(results))	
+model.save_weights(RNG_NAME+"_""BIT_%d"%BIT)
