@@ -84,7 +84,8 @@ def build_model(hp):
 	opt = keras.optimizers.Nadam(
 		learning_rate=hp.Float("learning_rate", 10**-6.5,10**-5.0,sampling="log"),
 		epsilon= 1e-9,
-		beta_2=hp.Float("beta_2",.5001,.9,sampling="reverse_log")
+		beta_1=hp.Float("beta_1",.1,.99,sampling="reverse_log"),
+		beta_2=hp.Float("beta_2",.1,.99,sampling="reverse_log")
 	)
 	model.compile(optimizer=opt,loss=LOSS_FUNCTION,metrics=[METRIC_FUNCTION])
 	model.summary()
