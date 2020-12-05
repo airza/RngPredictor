@@ -3,13 +3,17 @@ import tensorflow as tf
 import kerastuner as kt
 from tensorflow import keras
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense, LSTM
-from tensorflow.keras.experimental import PeepholeLSTMCell
+from tensorflow.keras.layers import Dense, MultiHeadAttention,BatchNormalization,ReLU
+from tensorflow.keras import Input
 import datetime
 from extractor import get_data_from_file
-IMPORT_COUNT = 1999000
+IMPORT_COUNT = 1020000
 TEST_COUNT = 20000
-RNG_NAME="xorshift128plus"
+PREV_COUNT = 2
+BIT=0
+RNG_NAME = "xorshift128plus"
+LOSS_FUNCTION ='mse'
+METRIC_FUNCTION = 'binary_accuracy'
 """
 Control how many outputs back the model should look.
 If you are not sure, I would suggest
@@ -17,7 +21,8 @@ If you are not sure, I would suggest
 If your RNG produces low entropy output, you
 may need more past data-but I have no tested this.
 """
-X,y=get_data_from_file(RNG_NAME+'.rng',IMPORT_COUNT,2)
+
+X,y=get_data_from_file(RNG_NAME+'.rng',IMPORT_COUNT,PREV_COUNT,bit=BIT)
 """
 Default model assumes that you want to use an LSTM to learn underlying
 state about the representation. There is some reason to beleive that
@@ -27,7 +32,7 @@ np.reshape(X,[TOTAL_DATA_NUM,-1])
 so for example x goes from a (TOTAL_DATA_NUM,32,4) tensor to a
 (TOTAL_DATA_NUM,32*4) tensor
 """
-
+X = np.reshape(X,[X.shape[0],-1])
 X_train = X[TEST_COUNT:]
 X_test = X[:TEST_COUNT]
 y_train = y[TEST_COUNT:]
@@ -44,53 +49,66 @@ I didn't have much success with non relu activations (vanishing gradient problem
 and although it would make more sense for the final layer to be constrained to (0,1)
 that didn't seem to work very well either.
 """
-print(X.shape)
-print(y.shape)
-exit(0)
-def fastLoss(y_true,y_pred):
-	s = 10*tf.math.abs(y_true-y_pred)
-	return tf.math.reduce_logsumexp(s)
+def schedule(epoch,lr):
+	if epoch<5:
+		return 10**(-3.2)
+	else:
+		return 10**(-6.466297830785874)
+LrScheduler = tf.keras.callbacks.LearningRateScheduler(
+    schedule, verbose=0
+)
+def transformer(layer,num_heads,key_dim):
+	_in =Dense(X.shape[1],activation="relu",bias_initializer=tf.keras.initializers.glorot_uniform)(layer)
+	mha = MultiHeadAttention(num_heads=num_heads,key_dim=key_dim,attention_axes=1,bias_initializer=tf.keras.initializers.glorot_uniform)
+	res = mha(_in,_in)
+	return tf.keras.layers.ReLU(negative_slope=.01)(layer+res)
 def build_model(hp):
-	LOSS="mse"
-	model = Sequential()
-	width = hp.Int("network_width",128,512,sampling="log")
-	model.add(LSTM(units=width*3,activation='relu',input_shape=(X.shape[1],X.shape[2]),return_sequences=False,))
-	for depth in range(hp.Int("network_depth",6,12,sampling="log")):
-		model.add(Dense(width,activation='relu'))
-	model.add(Dense(y.shape[1],activation='sigmoid'))
-	opt = keras.optimizers.Nadam(
-		learning_rate=hp.Float("learning_rate", 10**(-1), 10**(-7),sampling="log"),
-		epsilon=1e-7,
-		beta_1=.9,
-		beta_2=.9,
-		)
-	model.compile(optimizer=opt, loss='mse',metrics=['binary_accuracy'])
+	#model stuff
+	network_size = hp.Float("size",.4,1)*X.shape[1]
+	t_count = hp.Int("t_count",2,6,sampling="log")
+	network_size/=t_count
+	t_count-=1
+	key_width = hp.Int("key_dim",2,32,sampling="log")
+	network_size/=key_width
+	heads = max(int(network_size),1)
+	inputs = Input(shape=(X.shape[1],))
+	inputs_1 = inputs*2
+	inputs_2 = inputs_1-1
+	t = transformer(inputs_2,heads,key_width)
+	for i in range(t_count):
+		t = transformer(t,heads,key_width)
+	outputSize = 1 if len(y.shape)==1 else y.shape[1]
+	outLayer= Dense(outputSize,bias_initializer=tf.keras.initializers.Constant(value=0))(t)
+	out = outLayer*.5
+	output = out+.5
+
+	#optimizer definition
+	useNes = hp.Choice("nesterov",[True,False])
+	model =keras.Model(inputs=inputs,outputs=output,name="fuckler")
+	opt = tf.keras.optimizers.SGD(
+		momentum=hp.Float("momentum",.1,.99,sampling="reverse_log"),
+		learning_rate=hp.Float("learning_rate", 10**-6.5,10**-2.0,sampling="log"),
+		nesterov= True if useNes else False
+	)
+	model.compile(optimizer=opt,loss=LOSS_FUNCTION,metrics=[METRIC_FUNCTION])
+	model.summary()
 	return model
-X_train_short= X_train[:600000]
-y_train_short= y_train[:600000]
-#define CB
-stopEarly = tf.keras.callbacks.EarlyStopping(monitor='binary_accuracy', min_delta=.001, patience=20, verbose=0, mode='auto', restore_best_weights=False)
-log_dir = "logs/"+RNG_NAME+"_"+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-tensorboard_callback = keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1,profile_batch=0)
-tuner = kt.tuners.bayesian.BayesianOptimization(build_model,'binary_accuracy',40,project_name=RNG_NAME+"_hp_search")
-#tuner.search(X_train_short, y_train_short,batch_size=256,verbose=0,epochs=100,validation_data=(X_test,y_test),callbacks=[tensorboard_callback])
+
+log_dir = "logs/"+RNG_NAME+"/"+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+
+class StopWhenDoneCallback(keras.callbacks.Callback):
+    def on_epoch_end(self, epoch, logs=None):
+    	accuracy= logs['binary_accuracy']
+    	if accuracy>.99:
+    		self.model.stop_training = True
+#tensorboard_callback = keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1,write_graph=False,profile_batch=0)
+tuner = kt.tuners.randomsearch.RandomSearch(build_model,METRIC_FUNCTION,100,project_name="hp_search_"+RNG_NAME)
+tuner.search(X_train, y_train,batch_size=256,verbose=1,epochs=200,validation_data=(X_test,y_test),callbacks=[StopWhenDoneCallback(),tf.keras.callbacks.TerminateOnNaN()])
 tuner.results_summary()
-best_hps = tuner.get_best_hyperparameters(num_trials = 1)[0]
+best_hps = tuner.get_best_hyperparameters(num_trials = 2)[1]
 model = tuner.hypermodel.build(best_hps)
-"""
-Annealing process: several cycles on the same model on training on a subset
-of the data, then all of the data.  I didn't have any success getting it to
-learn from the full dataset at once, but I didn't test it across smaller
-batch sizes or different HPs than the smaller subset.  Those would be good
-things to do if I had spare cloud compute.  But in the end, this works quite
-well and is *much* faster than training all 2 million examples.
-"""
-for i in range(6):
-	model.fit(X_train_short, y_train_short, epochs=50, batch_size=256,callbacks=[tensorboard_callback],verbose=0)
-	results = model.evaluate(X_test, y_test, batch_size=128)
-	print("test loss: %f, test acc: %s" % tuple(results))
-	model.fit(X_train, y_train, epochs=10, batch_size=256,callbacks=[tensorboard_callback,],verbose=0)
-	results = model.evaluate(X_test, y_test, batch_size=128)
-	print("test loss: %f, test acc: %s" % tuple(results))
-	model.save_weights(RNG_NAME+"_weights_annealing_pass_"+str(i))
-model.save_weights(RNG_NAME+"_weights_annealing_pass_DONE")
+model.summary()
+model.fit(X_train,y_train,epochs=500, batch_size=256,callbacks=[tensorboard_callback,StopWhenDoneCallback(),LrScheduler],validation_data=(X_test,y_test),verbose=0)
+results = model.evaluate(X_test, y_test, batch_size=128)
+print("test loss: %f, test acc: %s" % tuple(results))	
+model.save_weights(RNG_NAME+"_""BIT_%d"%BIT)

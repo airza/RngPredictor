@@ -2,4 +2,4 @@ logs*
 checkpoint
 *.rng
 __pycache__
-*_hp_search
+hp_search_*

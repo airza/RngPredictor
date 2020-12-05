@@ -7,7 +7,7 @@ def strided(a, L):
 	shp_in = (nd0,L)+shp[1:]
 	strd_in = (s[0],) + s
 	return np.lib.stride_tricks.as_strided(a, shape=shp_in, strides=strd_in)
-def get_data_from_file(filename,total_data_count,previous_timestep_count):
+def get_data_from_file(filename,total_data_count,previous_timestep_count,bit=0):
 	TOTAL_DATA_NUM = total_data_count-previous_timestep_count
 	df = np.genfromtxt(filename,delimiter='\n',dtype='uint64')[:total_data_count]
 	#calculates how many bits are in the output.
@@ -19,12 +19,13 @@ def get_data_from_file(filename,total_data_count,previous_timestep_count):
 	df_as_bits =(df[:,None] & (1 << np.arange(BIT_WIDTH,dtype='uint64')) > 0).astype(int)
 	df_as_frames = strided(df_as_bits,previous_timestep_count+1)
 	#normal shuffle doesn't work for some reason, oh well
-	indicies = np.arange(TOTAL_DATA_NUM,dtype='uint64')
-	np.random.shuffle(indicies)
-	df_as_frames=df_as_frames[indicies]
+	#indicies = np.arange(TOTAL_DATA_NUM,dtype='uint64')
+	#np.random.shuffle(indicies)
+	#df_as_frames=df_as_frames[indicies]
 	#Now is the correct time if you want to narrow the RNG prediction to specific bits
 	#which is probably a much easier problem (e.g.)
-	# y = df_as_frames[:,-1,:][:,_INSERT_MASK_HERE_]
-	y = df_as_frames[:,-1,:].astype('float64')
+	#y = df_as_frames[:,-1,:]
+	#will take only 2 bits.
+	y = df_as_frames[:,-1,:][:,bit]
 	X = df_as_frames[:,:-1,]
 	return (X,y)
