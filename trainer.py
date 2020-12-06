@@ -7,7 +7,7 @@ from tensorflow.keras.layers import Dense, MultiHeadAttention,BatchNormalization
 from tensorflow.keras import Input
 import datetime
 from extractor import get_data_from_file
-LOG_STEPS = 10
+LOG_STEPS = 5
 IMPORT_COUNT = 2**19
 TEST_COUNT = 2**14
 PREV_COUNT = 2
@@ -119,7 +119,7 @@ MAXEPOCHS=50
 for epochs,training_slice in enumerate(training_size):
 	#epochs = int(MAXEPOCHS*(training_slice/X_train.shape[0])) if fastmode else MAXEPOCHS
 	training_slice= int(training_slice)
-	epochs= 3*(1+epochs)
+	epochs= 2 *(1+epochs)
 	X_slice= X_train[:training_slice] if fastmode else X_train
 	y_slice= y_train[:training_slice] if fastmode else y_train
 	model.fit(X_slice,y_slice,batch_size=BATCH_SIZE,verbose=0,epochs=epochs,validation_data=(X_test,y_test),callbacks=[StopWhenDoneCallback(),tf.keras.callbacks.TerminateOnNaN(),tensorboard_callback])
