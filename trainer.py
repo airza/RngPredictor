@@ -7,11 +7,13 @@ from tensorflow.keras.layers import Dense, MultiHeadAttention,BatchNormalization
 from tensorflow.keras import Input
 import datetime
 from extractor import get_data_from_file
-IMPORT_COUNT = 600000
-TEST_COUNT = 20000
-PREV_COUNT = 4
+LOG_STEPS = 10
+IMPORT_COUNT = 2**19
+TEST_COUNT = 2**14
+PREV_COUNT = 2
 BIT=0
-RNG_NAME = "xorshift128"
+BATCH_SIZE = 8
+RNG_NAME = "xorshift128plus"
 if "xorshift128plus" == RNG_NAME:
 	PREV_COUNT = 2
 elif "xorshift128" == RNG_NAME:
@@ -54,58 +56,76 @@ and although it would make more sense for the final layer to be constrained to (
 that didn't seem to work very well either.
 """
 
-def transformer(layer,num_heads,key_dim,activation='relu'):
-	_in =Dense(X.shape[1],activation=activation,bias_initializer=tf.keras.initializers.glorot_uniform)(layer)
-	mha = MultiHeadAttention(num_heads=num_heads,key_dim=key_dim,attention_axes=1,bias_initializer=tf.keras.initializers.glorot_uniform)
+def transformer(layer,num_heads,key_dim,leak=0):
+	lrelu = lambda x: tf.keras.activations.relu(x, alpha=leak)
+	_in =Dense(X.shape[1],activation=lrelu)(layer)
+	
+	mha = MultiHeadAttention(num_heads=num_heads,key_dim=key_dim,attention_axes=1,)
 	res = mha(_in,_in)
-	return tf.keras.layers.ReLU(negative_slope=.01)(layer+res)
+	out = Dense(X.shape[1],activation=lrelu)(res)
+	return tf.keras.layers.ReLU(negative_slope=leak)(layer+out)
 def build_model(hp):
 	#model stuff
 	network_size = hp.Float("size",.25,.5)*X.shape[1]
 	t_count = hp.Int("t_count",2,6,sampling="log")
 	network_size/=t_count
-	t_count-=1
+	#t_count-=1
+	t_count
 	key_width = hp.Int("key_dim",2,32,sampling="log")
 	network_size/=key_width
 	heads = max(int(network_size),1)
 	inputs = Input(shape=(X.shape[1],))
 	leakiness = hp.Float("relu_leakiness",.0001,.1,sampling="log")
-	lrelu = lambda x: tf.keras.activations.relu(x, alpha=leakiness)
 	inputs_1 = inputs*2
 	inputs_2 = inputs_1-1
-	t = transformer(inputs_2,heads,key_width,lrelu)
+	t = transformer(inputs_2,heads,key_width,leakiness)
 	for i in range(t_count):
 		t = transformer(t,heads,key_width)
 	outputSize = 1 if len(y.shape)==1 else y.shape[1]
-	outLayer= Dense(outputSize,bias_initializer=tf.keras.initializers.Constant(value=0))(t)
+	outLayer= Dense(outputSize,bias_initializer=tf.keras.initializers.Constant(value=0))(t)  
 	out = outLayer*.5
 	output = out+.5
 	model =keras.Model(inputs=inputs,outputs=output,name="fuckler")
 	opt = keras.optimizers.Nadam(
-		learning_rate=hp.Float("learning_rate", 10**-4.5,10**-3,sampling="log"),
+		learning_rate=hp.Float("learning_rate", 10**-3,10**-2,sampling="log")/100,
 		epsilon= 1e-9,
 		beta_1=hp.Float("beta_1",.1,.99,sampling="reverse_log"),
-		beta_2=hp.Float("beta_2",.1,.99,sampling="reverse_log")
+		beta_2=.95
 	)
 	model.compile(optimizer=opt,loss=LOSS_FUNCTION,metrics=[METRIC_FUNCTION])
 	model.summary()
 	return model
 
-log_dir = "logs/"+RNG_NAME+"/"+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+
 
 class StopWhenDoneCallback(keras.callbacks.Callback):
     def on_epoch_end(self, epoch, logs=None):
     	accuracy= logs['binary_accuracy']
     	if accuracy>.99:
     		self.model.stop_training = True
+log_dir = "logs/"+RNG_NAME+"/"+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 tensorboard_callback = keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1,write_graph=False,profile_batch=0)
-tuner = kt.tuners.randomsearch.RandomSearch(build_model,METRIC_FUNCTION,100,project_name="hp_search_"+RNG_NAME)
-tuner.search(X_train, y_train,batch_size=512,verbose=0,epochs=20,validation_data=(X_test,y_test),callbacks=[StopWhenDoneCallback(),tf.keras.callbacks.TerminateOnNaN(),tensorboard_callback])
+tuner = kt.tuners.randomsearch.RandomSearch(build_model,METRIC_FUNCTION,200,project_name="hp_search_xorshift128")
+#tuner.search(X_train, y_train,batch_size=BATCH_SIZE,verbose=0,epochs=5,validation_data=(X_test,y_test),callbacks=[StopWhenDoneCallback(),tf.keras.callbacks.TerminateOnNaN(),tensorboard_callback])
 tuner.results_summary()
-best_hps = tuner.get_best_hyperparameters(num_trials = 2)[1]
+training_size = np.geomspace(BATCH_SIZE, X_train.shape[0]-1, num=LOG_STEPS)
+best_hps = tuner.get_best_hyperparameters(num_trials =6)[-1]
+print(best_hps)
+fastmode=True
+log_dir = "logs/"+RNG_NAME+"/%s/"%("fastmode" if fastmode else "normal")+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+tensorboard_callback = keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1,write_graph=False,profile_batch=0)
 model = tuner.hypermodel.build(best_hps)
-model.summary()
-model.fit(X_train, y_train,batch_size=512,verbose=0,epochs=20,validation_data=(X_test,y_test),callbacks=[StopWhenDoneCallback(),tf.keras.callbacks.TerminateOnNaN(),tensorboard_callback])
-results = model.evaluate(X_test, y_test, batch_size=128)
-print("test loss: %f, test acc: %s" % tuple(results))	
-model.save_weights(RNG_NAME+"_""BIT_%d"%BIT)
+MAXEPOCHS=50
+for epochs,training_slice in enumerate(training_size):
+	#epochs = int(MAXEPOCHS*(training_slice/X_train.shape[0])) if fastmode else MAXEPOCHS
+	training_slice= int(training_slice)
+	epochs= 3*(1+epochs)
+	X_slice= X_train[:training_slice] if fastmode else X_train
+	y_slice= y_train[:training_slice] if fastmode else y_train
+	model.fit(X_slice,y_slice,batch_size=BATCH_SIZE,verbose=0,epochs=epochs,validation_data=(X_test,y_test),callbacks=[StopWhenDoneCallback(),tf.keras.callbacks.TerminateOnNaN(),tensorboard_callback])
+	results = model.evaluate(X_test, y_test, batch_size=BATCH_SIZE)
+	print("test loss: %f, test acc: %s" % tuple(results))
+	if results[1]>.9999:
+		break
+	model.save_weights(RNG_NAME+"_WEIGHTS_%02d"%epochs)
+model.save_weights("128plusplus")
