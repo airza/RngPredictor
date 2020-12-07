@@ -12,7 +12,7 @@ IMPORT_COUNT = 2**19
 TEST_COUNT = 2**14
 PREV_COUNT = 2
 BIT=0
-BATCH_SIZE = 8
+BATCH_SIZE = 32
 RNG_NAME = "xorshift128plus"
 if "xorshift128plus" == RNG_NAME:
 	PREV_COUNT = 2
@@ -87,7 +87,7 @@ def build_model(hp):
 	output = out+.5
 	model =keras.Model(inputs=inputs,outputs=output,name="fuckler")
 	opt = keras.optimizers.Nadam(
-		learning_rate=hp.Float("learning_rate", 10**-3,10**-2,sampling="log")/100,
+		learning_rate=hp.Float("learning_rate", 10**-3,10**-2,sampling="log")/50,
 		epsilon= 1e-9,
 		beta_1=hp.Float("beta_1",.1,.99,sampling="reverse_log"),
 		beta_2=.95
@@ -116,16 +116,8 @@ log_dir = "logs/"+RNG_NAME+"/%s/"%("fastmode" if fastmode else "normal")+datetim
 tensorboard_callback = keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1,write_graph=False,profile_batch=0)
 model = tuner.hypermodel.build(best_hps)
 MAXEPOCHS=50
-for epochs,training_slice in enumerate(training_size):
-	#epochs = int(MAXEPOCHS*(training_slice/X_train.shape[0])) if fastmode else MAXEPOCHS
-	training_slice= int(training_slice)
-	epochs= 2 *(1+epochs)
-	X_slice= X_train[:training_slice] if fastmode else X_train
-	y_slice= y_train[:training_slice] if fastmode else y_train
-	model.fit(X_slice,y_slice,batch_size=BATCH_SIZE,verbose=0,epochs=epochs,validation_data=(X_test,y_test),callbacks=[StopWhenDoneCallback(),tf.keras.callbacks.TerminateOnNaN(),tensorboard_callback])
-	results = model.evaluate(X_test, y_test, batch_size=BATCH_SIZE)
-	print("test loss: %f, test acc: %s" % tuple(results))
-	if results[1]>.9999:
-		break
-	model.save_weights(RNG_NAME+"_WEIGHTS_%02d"%epochs)
-model.save_weights("128plusplus")
+model.load_weights("128plusplusDifferent")
+model.fit(X_train,y_train,batch_size=BATCH_SIZE,verbose=1,epochs=50,validation_data=(X_test,y_test),callbacks=[StopWhenDoneCallback(),tf.keras.callbacks.TerminateOnNaN(),tensorboard_callback])
+results = model.evaluate(X_test, y_test, batch_size=BATCH_SIZE)
+print("test loss: %f, test acc: %s" % tuple(results))
+model.save('128plus_model')
