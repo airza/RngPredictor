@@ -19,9 +19,9 @@ def get_data_from_file(filename,total_data_count,previous_timestep_count,bit=Non
 	df_as_bits =(df[:,None] & (1 << np.arange(BIT_WIDTH,dtype='uint64')) > 0).astype(int)
 	df_as_frames = strided(df_as_bits,previous_timestep_count+1)
 	#normal shuffle doesn't work for some reason, oh well
-	#indicies = np.arange(TOTAL_DATA_NUM,dtype='uint64')
-	#np.random.shuffle(indicies)
-	#df_as_frames=df_as_frames[indicies]
+	indicies = np.arange(TOTAL_DATA_NUM,dtype='uint64')
+	np.random.shuffle(indicies)
+	df_as_frames=df_as_frames[indicies]
 	#Now is the correct time if you want to narrow the RNG prediction to specific bits
 	#which is probably a much easier problem (e.g.)
 	#y = df_as_frames[:,-1,:]

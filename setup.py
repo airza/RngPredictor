@@ -15,8 +15,8 @@ def xorshift128():
 		return w
 	return _random
 def xorshift128plus():
-	x = 1234567890
-	y = 9876543210
+	x = 1
+	y = 2
 	MAXSIZE=0xFFFFFFFFFFFFFFFF
 	def _rand():
 		nonlocal y,x
@@ -38,9 +38,7 @@ def sequence():
 		return s
 	return _rand
 if __name__ == '__main__':
-	for f in [xorshift128plus,xorshift128]:
-		pass
-		"""
+	for f in [xorshift128plus]:#,xorshift128]:
 		_file = open(f.__name__+".rng","w")
 		_file2 = open(f.__name__+"_extra.rng","w")
 		rng = f()
@@ -57,3 +55,4 @@ if __name__ == '__main__':
 				z = (rng()) >> d
 				_file.write(str(z)+"\n")
 			_file.close()
+        """
