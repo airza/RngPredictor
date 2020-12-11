@@ -20,49 +20,6 @@ elif "xorshift128" == RNG_NAME:
 	PREV_COUNT = 4
 LOSS_FUNCTION ='mse'
 METRIC_FUNCTION = 'binary_accuracy'
-"""
-Control how many outputs back the model should look.
-If you are not sure, I would suggest
-(Size of the RNG state in bits)/(Bits of output from the RNG).
-If your RNG produces low entropy output, you
-may need more past data-but I have no tested this.
-"""
-
-X,y=get_data_from_file(RNG_NAME+'.rng',IMPORT_COUNT,PREV_COUNT,bit=BIT)
-"""
-Default model assumes that you want to use an LSTM to learn underlying
-state about the representation. There is some reason to beleive that
-you could just input a
-ll of the bits as a flat array; if so, use
-np.reshape(X,[TOTAL_DATA_NUM,-1])
-so for example x goes from a (TOTAL_DATA_NUM,32,4) tensor to a
-(TOTAL_DATA_NUM,32*4) tensor
-"""
-X = np.reshape(X,[X.shape[0],-1])
-X_train = X[TEST_COUNT:]
-X_test = X[:TEST_COUNT]
-y_train = y[TEST_COUNT:]
-y_test = y[:TEST_COUNT]
-
-"""
-some notes on my experience with hyperparameters, which are not really
-explained in detail in the blog:
-Deeper networks don't seem to help (no surprise)
-The ability of the model to learn seems to be very sensitive to the learning rate
-If you are constrained for compute searching as much of the log learning rate space
-as possible is probably the best bang for your bucks
-I didn't have much success with non relu activations (vanishing gradient problemos)
-and although it would make more sense for the final layer to be constrained to (0,1)
-that didn't seem to work very well either.
-"""
-
-def resBlock(layer,depth,width,leak=0,dropout=0):
-	layer2 = layer
-	lrelu = lambda x: tf.keras.activations.relu(x, alpha=leak)
-	for i in range(depth):
-		layer = Dense(width,activation=lrelu)(layer)
-	return tf.keras.layers.ReLU(negative_slope=leak)(layer+l)
-
 def transformer(layer,num_heads,key_dim,leak=0,dropout=0):
 	lrelu = lambda x: tf.keras.activations.relu(x, alpha=leak)
 	mha = MultiHeadAttention(num_heads=num_heads,key_dim=key_dim,attention_axes=1,dropout=dropout)
@@ -71,11 +28,15 @@ def transformer(layer,num_heads,key_dim,leak=0,dropout=0):
 	res = tf.keras.layers.ReLU(negative_slope=leak)(layer+res)
 	return res
 def build_model(hp):
-	feature_dim = 20
-	leakiness = hp.Choice("leakiness",[0.0,.001,.01,.1])
+	size = hp.Float("size",1,1.5)*20*3*8*3
+	feature_dim = hp.Int("feature_dim",16,24,sampling="log")
+	size/=feature_dim
+	t_count = hp.Choice("t_count",2,4)
+	size/=t_count
+
 	lrelu = lambda x: tf.keras.activations.relu(x,alpha=leakiness)
-	t_count = 3
 	key_dim = 8
+	leakiness = .01
 	dropout = 0#hp.Choice("dropout",[0.0,.001,.1])
 	heads = 3
 	inputs = Input(shape=(X.shape[1],))
@@ -99,26 +60,34 @@ def build_model(hp):
 		beta_2= hp.Float("beta_2", .5,.99,sampling="log"),
 	)
 	model.compile(optimizer=opt,loss=loss,metrics=[METRIC_FUNCTION])
-	model.summary()
 	return model
-
-
-
 class StopWhenDoneCallback(keras.callbacks.Callback):
     def on_epoch_end(self, epoch, logs=None):
     	accuracy= logs['binary_accuracy']
     	if accuracy>.99:
     		self.model.stop_training = True
-log_dir = "logs/"+RNG_NAME+"/%03d/"%BATCH_SIZE+"%02d/"%BIT+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-tensorboard_callback = keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1,write_graph=False,profile_batch=0)
-tuner = kt.tuners.randomsearch.RandomSearch(build_model,METRIC_FUNCTION,200,project_name="hp_"+RNG_NAME+"_%03d"%BIT)
-tuner.search(X_train, y_train,batch_size=BATCH_SIZE,verbose=1,epochs=15,validation_data=(X_test,y_test),callbacks=[StopWhenDoneCallback(),tf.keras.callbacks.TerminateOnNaN(),tensorboard_callback])
-tuner.results_summary()
-best_hps = tuner.get_best_hyperparameters(num_trials =1)[1]
-log_dir = "logs/"+RNG_NAME+"/run/"+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-tensorboard_callback = keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1,write_graph=False,profile_batch=0)
-model = tuner.hypermodel.build(best_hps)
-model.fit(X_train,y_train,batch_size=BATCH_SIZE,verbose=1,epochs=500,validation_data=(X_test,y_test),callbacks=[StopWhenDoneCallback(),tf.keras.callbacks.TerminateOnNaN(),tensorboard_callback])
-results = model.evaluate(X_test, y_test, batch_size=BATCH_SIZE)
-print("test loss: %f, test acc: %s" % tuple(results))
-model.save('128plus_model')
+"""
+Control how many outputs back the model should look.
+If you are not sure, I would suggest
+(Size of the RNG state in bits)/(Bits of output from the RNG).
+If your RNG produces low entropy output, you
+may need more past data-but I have no tested this.
+"""
+for BIT in range(3,32):
+	X,y=get_data_from_file(RNG_NAME+'.rng',IMPORT_COUNT,PREV_COUNT,bit=BIT)
+	X = np.reshape(X,[X.shape[0],-1])
+	X_train = X[TEST_COUNT:]
+	X_test = X[:TEST_COUNT]
+	y_train = y[TEST_COUNT:]
+	y_test = y[:TEST_COUNT]
+	log_dir = "logs/"+RNG_NAME+"/BIT_NUM_%02d/"%BIT+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+	tensorboard_callback = keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1,write_graph=False,profile_batch=0)
+	tuner = kt.tuners.randomsearch.RandomSearch(build_model,METRIC_FUNCTION,20,project_name="hp_"+RNG_NAME+"_%02d"%BIT)
+	tuner.search(X_train, y_train,batch_size=BATCH_SIZE,verbose=0,epochs=15,validation_data=(X_test,y_test),callbacks=[StopWhenDoneCallback(),tf.keras.callbacks.TerminateOnNaN(),tensorboard_callback])
+	tuner.results_summary()
+	best_hps = tuner.get_best_hyperparameters(num_trials =1)[0]
+	model = tuner.hypermodel.build(best_hps)
+	model.fit(X_train, y_train,batch_size=BATCH_SIZE,verbose=0,epochs=100,validation_data=(X_test,y_test),callbacks=[StopWhenDoneCallback(),tf.keras.callbacks.TerminateOnNaN(),tensorboard_callback])
+	results = model.evaluate(X_test, y_test, batch_size=BATCH_SIZE)
+	model.save('xorshift128_plus_bit_%2d'%BIT)
+	print("BIT NUMBER:"+str(BIT)+" ------- test loss: %f, test acc: %s" % tuple(results))
