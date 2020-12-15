@@ -7,7 +7,7 @@ def strided(a, L):
 	shp_in = (nd0,L)+shp[1:]
 	strd_in = (s[0],) + s
 	return np.lib.stride_tricks.as_strided(a, shape=shp_in, strides=strd_in)
-def get_data_from_file(filename,total_data_count,previous_timestep_count,bit=None):
+def get_data_from_file(filename,total_data_count,previous_timestep_count,start_bit=None,end_bit=None):
 	TOTAL_DATA_NUM = total_data_count-previous_timestep_count
 	df = np.genfromtxt(filename,delimiter='\n',dtype='uint64')[:total_data_count]
 	#calculates how many bits are in the output.
@@ -26,9 +26,9 @@ def get_data_from_file(filename,total_data_count,previous_timestep_count,bit=Non
 	#which is probably a much easier problem (e.g.)
 	#y = df_as_frames[:,-1,:]
 	#will take only 2 bits.
-	if bit==None:
+	if start_bit==None:
 		y = df_as_frames[:,-1,:]
 	else:
-		y = df_as_frames[:,-1,:][:,bit]
+		y = df_as_frames[:,-1,:][:,start_bit:end_bit]
 	X = df_as_frames[:,:-1,]
 	return (X,y)
