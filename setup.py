@@ -40,7 +40,6 @@ def sequence():
 if __name__ == '__main__':
 	for f in [xorshift128plus,xorshift128]:
 		pass
-		"""
 		_file = open(f.__name__+".rng","w")
 		_file2 = open(f.__name__+"_extra.rng","w")
 		rng = f()
@@ -49,7 +48,6 @@ if __name__ == '__main__':
 		for i in range(2*ENOUGH_DATA):
 			_file2.write(str(rng())+"\n")
 		_file.close()
-		"""
 		for d in [31,16,8,4,2,1]:
 			_file = open(f.__name__+"TRUNCATED_%d.rng"%d,"w")
 			rng = f()
