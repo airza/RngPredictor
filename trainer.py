@@ -8,7 +8,7 @@ if torch.backends.mps.is_available():
 else:
     raise "aaaa"
 RNG_NAME = "xorshift128plus"
-IMPORT_COUNT = 4000000
+IMPORT_COUNT = 100000
 TEST_COUNT = 20000
 PREV_COUNT = 4
 BIT = 0
@@ -31,25 +31,28 @@ dataset_test = TensorDataset(X_test, y_test)
 train_loader = DataLoader(dataset_train, batch_size=BATCH_SIZE, shuffle=True)
 # Create DataLoader for test data with batch size
 test_loader = DataLoader(dataset_test, batch_size=BATCH_SIZE, shuffle=True)
-
 class Model(nn.Module):
-    def __init__(self, input_size, output_size, num_layers, num_heads, dim_feedforward):
+    def __init__(self, input_size, output_size, num_heads, dim_feedforward):
         super(Model, self).__init__()
-        self.transformer = nn.TransformerEncoderLayer(d_model=input_size, nhead=num_heads, dim_feedforward=dim_feedforward)
-        self.transformer_encoder = nn.TransformerEncoder(self.transformer, num_layers=num_layers)
+        self.transformer = nn.TransformerEncoderLayer(dropout=0,d_model=input_size, nhead=num_heads, dim_feedforward=dim_feedforward)
+        self.transformer2 = nn.TransformerEncoderLayer(dropout=0,d_model=input_size, nhead=num_heads, dim_feedforward=dim_feedforward)
+        self.transformer_encoder = nn.TransformerEncoder(self.transformer, num_layers=2)
         self.out = nn.Linear(input_size, output_size)
+        self.sig = nn.Sigmoid()
 
     def forward(self, x):
         x = self.transformer_encoder(x)
+        x = self.transformer2(x)
         x = self.out(x)
+        x = self.sig(x)
         return x
 
 
-model = Model(X.shape[1], 1, num_layers=4, num_heads=4, dim_feedforward=48).to(device)
-optimizer = torch.optim.NAdam(model.parameters(), lr=0.00001, betas=(0.9, 0.999), eps=1e-08)
+model = Model(X.shape[1], 1, num_heads=4, dim_feedforward=4).to(device)
+optimizer = torch.optim.SGD(model.parameters(), lr=0.0000001);
 criterion = LOSS_FUNCTION
 
-for epoch in range(100):
+for epoch in range(500):
     total_loss = 0.0
     model.train()
     for batch_X, batch_y in train_loader:
