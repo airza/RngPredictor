@@ -1,24 +1,24 @@
 import torch
 import torch.nn as nn
 from torch.utils.data import TensorDataset, DataLoader
-
 from extractor import get_data_from_file
 if torch.backends.mps.is_available():
     device = torch.device("mps")
 else:
     raise "aaaa"
 RNG_NAME = "xorshift128plus"
-IMPORT_COUNT = 100000
+IMPORT_COUNT = 4000000
 TEST_COUNT = 20000
 PREV_COUNT = 4
 BIT = 0
 LOSS_FUNCTION = nn.MSELoss()
 METRIC_FUNCTION = 'accuracy'
-BATCH_SIZE=1024
-PREV_COUNT = 2
+BATCH_SIZE= 64
+PREV_COUNT = 4
 
-X, y = get_data_from_file(RNG_NAME+'.rng', IMPORT_COUNT, PREV_COUNT,bit=0)
+X, y = get_data_from_file(RNG_NAME+'.rng', IMPORT_COUNT, PREV_COUNT,bit=1)
 X = X.reshape(X.shape[0],-1)
+y = y.reshape(-1, 1)
 X = torch.from_numpy(X).float()
 y = torch.from_numpy(y).float()
 X_train = X[:-TEST_COUNT]
@@ -35,23 +35,20 @@ class Model(nn.Module):
     def __init__(self, input_size, output_size, num_heads, dim_feedforward):
         super(Model, self).__init__()
         self.transformer = nn.TransformerEncoderLayer(dropout=0,d_model=input_size, nhead=num_heads, dim_feedforward=dim_feedforward)
-        self.transformer2 = nn.TransformerEncoderLayer(dropout=0,d_model=input_size, nhead=num_heads, dim_feedforward=dim_feedforward)
-        self.transformer_encoder = nn.TransformerEncoder(self.transformer, num_layers=2)
         self.out = nn.Linear(input_size, output_size)
         self.sig = nn.Sigmoid()
 
     def forward(self, x):
-        x = self.transformer_encoder(x)
-        x = self.transformer2(x)
+        x = self.transformer(x)
         x = self.out(x)
         x = self.sig(x)
         return x
 
 
-model = Model(X.shape[1], 1, num_heads=4, dim_feedforward=4).to(device)
-optimizer = torch.optim.SGD(model.parameters(), lr=0.0000001);
+model = Model(X.shape[1], 1, num_heads=4, dim_feedforward=2).to(device)
+optimizer = torch.optim.SGD(model.parameters(), lr=1e-2)
 criterion = LOSS_FUNCTION
-
+scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer,'min',threshold=0.001,patience=2,cooldown=3)
 for epoch in range(500):
     total_loss = 0.0
     model.train()
@@ -64,7 +61,7 @@ for epoch in range(500):
         loss.backward()
         optimizer.step()
         total_loss += loss.item()
-
+    scheduler.step(total_loss)
     print('Epoch:', epoch, 'Loss:', total_loss / len(train_loader))
 # model evaluation
 model.eval()
