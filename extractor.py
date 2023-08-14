@@ -32,3 +32,32 @@ def get_data_from_file(filename,total_data_count,previous_timestep_count,bit=Non
 		y = df_as_frames[:,-1,:][:,bit]
 	X = df_as_frames[:,:-1,]
 	return (X,y)
+
+def debug(State1,State2,X1,X2,X,n):
+	def int2bits(n):
+		return '{:064b}'.format(n)
+	def bits2str(bs):
+		return ''.join(map(str,bs))
+	s1,s2,x,x1,x2 = State1[n], State2[n], X[n],X1[n],X2[n]
+	print(int2bits(s1)+int2bits(s2))
+	print(bits2str(x))
+def getBits(df,BIT_WIDTH):
+	return (df[:,None] & (1 << np.arange(63,-1,-1,dtype='uint64')) > 0).astype(int)
+def get_input_and_output_from_file(filename,total_data_count):
+	data = np.loadtxt(filename, dtype=np.uint64)[:total_data_count]
+
+	# Separate the data into State1, State2, and Output
+	State1, State2, Output = data[:, 0], data[:, 1], data[:, 2]
+
+	# Convert each state into its 64-bit binary representation
+	X1 = getBits(State1,64)
+	X2 = getBits(State2,64)
+	Y = getBits(Output,64)
+
+	# Concatenate X1 and X2 to form the X array
+	X = np.concatenate((X1, X2), axis=1)
+	# Correct the endianness if needed
+	debug(State1, State2,X1,X2, X, 0)
+	return (X,Y)
+
+get_input_and_output_from_file('xorshift128_forward_pass.rng',1000)
