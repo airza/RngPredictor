@@ -42,8 +42,8 @@ def debug(State1,State2,X1,X2,X,n):
 	print(int2bits(s1)+int2bits(s2))
 	print(bits2str(x))
 def getBits(df,BIT_WIDTH):
-	return (df[:,None] & (1 << np.arange(63,-1,-1,dtype='uint64')) > 0).astype(int)
-def get_input_and_output_from_file(filename,total_data_count):
+	return (df[:,None] & (1 << np.arange(BIT_WIDTH-1,-1,-1,dtype='uint64')) > 0).astype(int)
+def get_input_and_output_from_file(filename,total_data_count,bit=None):
 	data = np.loadtxt(filename, dtype=np.uint64)[:total_data_count]
 
 	# Separate the data into State1, State2, and Output
@@ -53,11 +53,10 @@ def get_input_and_output_from_file(filename,total_data_count):
 	X1 = getBits(State1,64)
 	X2 = getBits(State2,64)
 	Y = getBits(Output,64)
-
+	if bit != None:
+		Y = Y[:,bit].reshape(-1,1)
 	# Concatenate X1 and X2 to form the X array
 	X = np.concatenate((X1, X2), axis=1)
 	# Correct the endianness if needed
 	debug(State1, State2,X1,X2, X, 0)
 	return (X,Y)
-
-get_input_and_output_from_file('xorshift128_forward_pass.rng',1000)

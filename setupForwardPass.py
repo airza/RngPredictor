@@ -1,7 +1,7 @@
 default_x = 1234567890
 default_y = 9876543210
 MAXSIZE = 0xFFFFFFFFFFFFFFFF
-COUNT = 100
+COUNT = 2000000
 def xorshift128plus(x,y):
 	s0,s1=y,x
 	s1 ^= (s1 << 23) & MAXSIZE
