@@ -2,16 +2,15 @@ import torch
 import torch.nn as nn
 from torch.utils.data import TensorDataset, DataLoader
 from extractor import get_input_and_output_from_file
-
+from forwardPassModel import Model
 if torch.backends.mps.is_available():
     device = torch.device("mps")
 else:
     raise "aaaa"
-IMPORT_COUNT = 10000
+IMPORT_COUNT = 100000
 TEST_COUNT = 100
 LOSS_FUNCTION = nn.MSELoss()
-BATCH_SIZE= 1024
-PREV_COUNT = 2
+BATCH_SIZE= 512
 
 X, y = get_input_and_output_from_file("xorshift128_forward_pass.rng", IMPORT_COUNT,bit=0)
 X = torch.from_numpy(X).float()
@@ -28,30 +27,14 @@ dataset_test = TensorDataset(X_test, y_test)
 train_loader = DataLoader(dataset_train, batch_size=BATCH_SIZE, shuffle=True)
 # Create DataLoader for test data with batch size
 test_loader = DataLoader(dataset_test, batch_size=BATCH_SIZE, shuffle=True)
-class Model(nn.Module):
-    def __init__(self, input_size, output_size, num_heads, dim_feedforward):
-        innerDim = 8
-        super(Model, self).__init__()
-        self.inn = nn.Linear(input_size, innerDim)
-        self.sigin = nn.Sigmoid()
-        self.transformer = nn.Transformer(d_model=innerDim, nhead=8, num_encoder_layers=4, num_decoder_layers=2, dim_feedforward=64)
-        self.out = nn.Linear(innerDim, output_size)
-        self.sig = nn.Sigmoid()
 
-    def forward(self, x):
-        x = self.inn(x)
-        x = self.sigin(x)
-        x = self.transformer(x,x)
-        x = self.out(x)
-        x = self.sig(x)
-        return x
 
 print("??")
-model = Model(X.shape[1], 1, num_heads=6, dim_feedforward=10).to(device)
+model = Model().to(device)
 optimizer = torch.optim.NAdam(model.parameters(), lr=0.01, eps=1e-08)
 criterion = LOSS_FUNCTION
 scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer,'min',threshold=0.001,patience=2,cooldown=3)
-for epoch in range(500):
+for epoch in range(25):
     total_loss = 0.0
     model.train()
     for batch_X, batch_y in train_loader:
@@ -66,7 +49,7 @@ for epoch in range(500):
     scheduler.step(total_loss)
     print('Epoch:', epoch, 'Loss:', total_loss / len(train_loader))
 # model evaluation
-model.eval()
+torch.save(model, "./model.pth")
 with torch.no_grad():
     outputs = model(X_test)
     loss = criterion(outputs, y_test)
