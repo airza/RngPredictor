@@ -4,10 +4,11 @@ from torch.utils.data import TensorDataset, DataLoader
 from extractor import get_input_and_output_from_file
 from forwardPassModel import Model
 import sys
-if not sys.argv[1]:
-    bit = 0
+if len(sys.argv) == 1:
+    bit = 32
 else:
     bit = int(sys.argv[1])
+print("running on bit %d"%bit)
 if torch.backends.mps.is_available():
     device = torch.device("mps")
 else:
@@ -15,9 +16,9 @@ else:
 IMPORT_COUNT = 100000
 TEST_COUNT = 100
 LOSS_FUNCTION = nn.MSELoss()
-BATCH_SIZE= 1024
+BATCH_SIZE= 256
 
-X, y = get_input_and_output_from_file("xorshift128_forward_pass.rng", IMPORT_COUNT,bit=bit)
+X, y = get_input_and_output_from_file("xorshift128_minus_forward_pass.rng", IMPORT_COUNT,bit=bit)
 X = torch.from_numpy(X).float()
 X*=2
 X-=1
@@ -36,9 +37,9 @@ test_loader = DataLoader(dataset_test, batch_size=BATCH_SIZE, shuffle=True)
 
 print("??")
 model = Model().to(device)
-optimizer = torch.optim.NAdam(model.parameters(), lr=0.01, eps=1e-08)
+optimizer = torch.optim.NAdam(model.parameters(), lr=0.001, eps=1e-08)
 criterion = LOSS_FUNCTION
-scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer,'min',threshold=0.001,patience=5,cooldown=3)
+scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer,'min',threshold=0.001,patience=10,cooldown=10)
 for epoch in range(200):
     total_loss = 0.0
     model.train()
@@ -53,7 +54,7 @@ for epoch in range(200):
         total_loss += loss.item()
     scheduler.step(total_loss)
     print('Epoch:', epoch, 'Loss:', total_loss / len(train_loader))
-    if total_loss / len(train_loader) < 0.0001:
+    if total_loss / len(train_loader) < 0.1:
         break
 # model evaluation
 bit_str = f'{bit:02}'

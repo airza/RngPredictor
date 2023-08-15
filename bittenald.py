@@ -1,4 +1,7 @@
 import subprocess
 for i in range(64):
-	print("calling setupForwardPass.py on bit %d"%i)
-	subprocess.call(["python3","setupForwardPass.py",str(i)])
+	with subprocess.Popen(["python3","forwardPassTrainer.py",str(i)], stdout=subprocess.PIPE, text=True) as proc:
+		for line in proc.stdout:
+			print(line, end='')
+	# Wait for the subprocess to finish
+	proc.wait()

@@ -5,7 +5,7 @@ class Model(nn.Module):
         super(Model, self).__init__()
         self.inn = nn.Linear(128, innerDim)
         self.sigin = nn.Sigmoid()
-        self.transformer = nn.Transformer(d_model=innerDim, nhead=8, num_encoder_layers=4, num_decoder_layers=2, dim_feedforward=64)
+        self.transformer = nn.Transformer(d_model=innerDim, nhead=8, num_encoder_layers=4, num_decoder_layers=2, dim_feedforward=8)
         self.out = nn.Linear(innerDim, 1)
         self.sig = nn.Sigmoid()
 

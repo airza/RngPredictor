@@ -4,3 +4,4 @@ checkpoint
 __pycache__
 hp_search_*
 .idea
+*.pth
