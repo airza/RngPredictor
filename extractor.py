@@ -58,5 +58,5 @@ def get_input_and_output_from_file(filename,total_data_count,bit=None):
 	# Concatenate X1 and X2 to form the X array
 	X = np.concatenate((X1, X2), axis=1)
 	# Correct the endianness if needed
-	debug(State1, State2,X1,X2, X, 0)
+	#debug(State1, State2,X1,X2, X, 0)
 	return (X,Y)

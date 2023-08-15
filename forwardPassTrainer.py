@@ -13,12 +13,12 @@ if torch.backends.mps.is_available():
     device = torch.device("mps")
 else:
     raise "aaaa"
-IMPORT_COUNT = 100000
+IMPORT_COUNT = 120000
 TEST_COUNT = 100
 LOSS_FUNCTION = nn.MSELoss()
-BATCH_SIZE= 256
-
-X, y = get_input_and_output_from_file("xorshift128_minus_forward_pass.rng", IMPORT_COUNT,bit=bit)
+BATCH_SIZE= 2048
+rng_type = "xorshift128_forward_pass"
+X, y = get_input_and_output_from_file(f'{rng_type}.rng', IMPORT_COUNT,bit=bit)
 X = torch.from_numpy(X).float()
 X*=2
 X-=1
@@ -39,8 +39,9 @@ print("??")
 model = Model().to(device)
 optimizer = torch.optim.NAdam(model.parameters(), lr=0.001, eps=1e-08)
 criterion = LOSS_FUNCTION
-scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer,'min',threshold=0.001,patience=10,cooldown=10)
-for epoch in range(200):
+epochs = 100
+scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, epochs,verbose=True)
+for epoch in range(epochs):
     total_loss = 0.0
     model.train()
     for batch_X, batch_y in train_loader:
@@ -52,13 +53,18 @@ for epoch in range(200):
         loss.backward()
         optimizer.step()
         total_loss += loss.item()
-    scheduler.step(total_loss)
+    scheduler.step()
     print('Epoch:', epoch, 'Loss:', total_loss / len(train_loader))
     if total_loss / len(train_loader) < 0.1:
         break
 # model evaluation
 bit_str = f'{bit:02}'
-torch.save(model, f'forwardPassModel_{bit_str}.pt')
+torch.save({
+            'epoch': epoch,
+            'model_state_dict': model.state_dict(),
+            'optimizer_state_dict': optimizer.state_dict(),
+            'loss': loss,
+            }, f'{rng_type}_{bit_str}.pth')
 with torch.no_grad():
     outputs = model(X_test)
     loss = criterion(outputs, y_test)

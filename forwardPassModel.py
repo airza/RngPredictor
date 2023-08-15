@@ -1,11 +1,12 @@
 import torch.nn as nn
+import torch
 class Model(nn.Module):
     def __init__(self):
-        innerDim = 8
+        innerDim = 2
         super(Model, self).__init__()
         self.inn = nn.Linear(128, innerDim)
         self.sigin = nn.Sigmoid()
-        self.transformer = nn.Transformer(d_model=innerDim, nhead=8, num_encoder_layers=4, num_decoder_layers=2, dim_feedforward=8)
+        self.transformer = nn.Transformer(d_model=innerDim, nhead=1, num_encoder_layers=1, num_decoder_layers=1, dim_feedforward=2,dropout=0.05,activation=nn.ELU())
         self.out = nn.Linear(innerDim, 1)
         self.sig = nn.Sigmoid()
 
