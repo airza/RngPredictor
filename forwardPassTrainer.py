@@ -16,7 +16,7 @@ else:
 IMPORT_COUNT = 120000
 TEST_COUNT = 100
 LOSS_FUNCTION = nn.MSELoss()
-BATCH_SIZE= 2048
+BATCH_SIZE= 64
 rng_type = "xorshift128_forward_pass"
 X, y = get_input_and_output_from_file(f'{rng_type}.rng', IMPORT_COUNT,bit=bit)
 X = torch.from_numpy(X).float()
