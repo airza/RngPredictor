@@ -37,7 +37,7 @@ test_loader = DataLoader(dataset_test, batch_size=BATCH_SIZE, shuffle=True)
 
 print("??")
 model = Model().to(device)
-optimizer = torch.optim.NAdam(model.parameters(), lr=0.001, eps=1e-08)
+optimizer = torch.optim.NAdam(model.parameters(), lr=0.00003125, eps=1e-08)
 criterion = LOSS_FUNCTION
 epochs = 100
 scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, epochs,verbose=True)
