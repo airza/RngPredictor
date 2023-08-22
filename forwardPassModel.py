@@ -2,7 +2,7 @@ import torch.nn as nn
 import torch
 class Model(nn.Module):
     def __init__(self):
-        innerDim = 2
+        innerDim = 4
         super(Model, self).__init__()
         self.inn = nn.Linear(128, innerDim)
         self.sigin = nn.Sigmoid()

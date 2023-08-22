@@ -1,7 +1,7 @@
 default_x = 1234567890
 default_y = 9876543210
 MAXSIZE = 0xFFFFFFFFFFFFFFFF
-COUNT = 1000000
+COUNT = 4000000
 import numpy as np
 def xorshift128plus(x,y):
 	s0,s1=y,x
@@ -35,9 +35,9 @@ def xorshift128minus(arr):
 	return (np.uint64(x), np.uint64(y), np.uint64(generated))
 #generate COUNT instances of x,y,generated, using x and y as the state for the rng
 
-f2 = open("xorshift128_minus_forward_pass.rng","w")
+f2 = open("xorshift128_forward_pass.rng","w")
 numbers = np.random.randint(0,MAXSIZE-1,size=(COUNT,2),dtype=np.uint64)
-outputs = np.apply_along_axis(xorshift128minus,1,numbers)
+outputs = np.apply_along_axis(xorshift128plus,1,numbers)
 all = np.concatenate((numbers,outputs),axis=1)
 #write each line to f2
 for line in all:

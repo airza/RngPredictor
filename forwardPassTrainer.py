@@ -5,7 +5,7 @@ from extractor import get_input_and_output_from_file
 from forwardPassModel import Model
 import sys
 if len(sys.argv) == 1:
-    bit = 32
+    bit = 33
 else:
     bit = int(sys.argv[1])
 print("running on bit %d"%bit)
@@ -13,10 +13,10 @@ if torch.backends.mps.is_available():
     device = torch.device("mps")
 else:
     raise "aaaa"
-IMPORT_COUNT = 120000
+IMPORT_COUNT = 1200000
 TEST_COUNT = 100
 LOSS_FUNCTION = nn.MSELoss()
-BATCH_SIZE= 64
+BATCH_SIZE= 2048
 rng_type = "xorshift128_forward_pass"
 X, y = get_input_and_output_from_file(f'{rng_type}.rng', IMPORT_COUNT,bit=bit)
 X = torch.from_numpy(X).float()
@@ -37,7 +37,7 @@ test_loader = DataLoader(dataset_test, batch_size=BATCH_SIZE, shuffle=True)
 
 print("??")
 model = Model().to(device)
-optimizer = torch.optim.NAdam(model.parameters(), lr=0.00003125, eps=1e-08)
+optimizer = torch.optim.NAdam(model.parameters(), lr=0.0004, eps=1e-08)
 criterion = LOSS_FUNCTION
 epochs = 100
 scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, epochs,verbose=True)
@@ -55,7 +55,7 @@ for epoch in range(epochs):
         total_loss += loss.item()
     scheduler.step()
     print('Epoch:', epoch, 'Loss:', total_loss / len(train_loader))
-    if total_loss / len(train_loader) < 0.1:
+    if total_loss / len(train_loader) < 0.01:
         break
 # model evaluation
 bit_str = f'{bit:02}'
