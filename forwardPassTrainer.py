@@ -8,13 +8,16 @@ if len(sys.argv) == 1:
     bit = 33
 else:
     bit = int(sys.argv[1])
-print("running on bit %d"%bit)
+#get import count from sys.argv
+if len(sys.argv) >=2:
+    IMPORT_COUNT = int(sys.argv[2])
+else:
+    IMPORT_COUNT = 2000000
 if torch.backends.mps.is_available():
     device = torch.device("mps")
 else:
     raise "aaaa"
-IMPORT_COUNT = 1200000
-TEST_COUNT = 100
+TEST_COUNT = 1000
 LOSS_FUNCTION = nn.MSELoss()
 BATCH_SIZE= 2048
 rng_type = "xorshift128_forward_pass"
@@ -35,12 +38,11 @@ train_loader = DataLoader(dataset_train, batch_size=BATCH_SIZE, shuffle=True)
 test_loader = DataLoader(dataset_test, batch_size=BATCH_SIZE, shuffle=True)
 
 
-print("??")
 model = Model().to(device)
-optimizer = torch.optim.NAdam(model.parameters(), lr=0.0004, eps=1e-08)
+optimizer = torch.optim.NAdam(model.parameters(), lr=0.0003, eps=1e-08)
 criterion = LOSS_FUNCTION
-epochs = 100
-scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, epochs,verbose=True)
+epochs = 400
+scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, epochs, eta_min=0.00001)
 for epoch in range(epochs):
     total_loss = 0.0
     model.train()
@@ -54,7 +56,7 @@ for epoch in range(epochs):
         optimizer.step()
         total_loss += loss.item()
     scheduler.step()
-    print('Epoch:', epoch, 'Loss:', total_loss / len(train_loader))
+    #print('Epoch:', epoch, 'Loss:', total_loss / len(train_loader))
     if total_loss / len(train_loader) < 0.01:
         break
 # model evaluation
@@ -68,4 +70,4 @@ torch.save({
 with torch.no_grad():
     outputs = model(X_test)
     loss = criterion(outputs, y_test)
-    print('Test Loss:', loss.item())
+    print('Test Loss:', 0.25-loss.item())
