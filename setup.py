@@ -37,8 +37,22 @@ def sequence():
 		s+=1
 		return s
 	return _rand
+def shifter():
+	x =  7459
+	y = 7417
+	MAXSIZE = 0xFFFFFFFFFFFFFFFF
+	def _rand():
+		nonlocal y,x
+		s0,s1=y,x
+		s1 ^= (s1 << 23) & MAXSIZE
+		s1 ^= (s1 >> 17)
+		s1 ^= s0
+		x = s0
+		y = s1
+		return (x+y) & MAXSIZE
+	return _rand
 if __name__ == '__main__':
-	for f in [xorshift128plus,xorshift128]:
+	for f in [xorshift128plus,xorshift128,shifter]:
 		pass
 		_file = open(f.__name__+".rng","w")
 		_file2 = open(f.__name__+"_extra.rng","w")

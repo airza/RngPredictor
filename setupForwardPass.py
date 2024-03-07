@@ -1,22 +1,40 @@
-default_x = 1234567890
-default_y = 9876543210
+import random
+
 MAXSIZE = 0xFFFFFFFFFFFFFFFF
-COUNT = 2000000
-def xorshift128plus(x,y):
-	s0,s1=y,x
+COUNT = 8000000
+
+
+def xorshift128plus(x, y):
+	s0, s1 = y, x
 	s1 ^= (s1 << 23) & MAXSIZE
 	s1 ^= (s1 >> 17)
 	s1 ^= s0
 	s1 ^= (s0 >> 26)
 	x = y
 	y = s1
-	generated = (x+y) & MAXSIZE
-	return (x,y,generated)
+	generated = (x + y) & MAXSIZE
+	return x, y, generated
 
-f = open("xorshift128_forward_pass.rng","w")
-x,y = default_x,default_y
-#generate COUNT instances of x,y,generated, using x and y as the state for the rng
+def xorinald(x, y):
+	s0, s1 = y, x
+	s1 ^= (s1 << 23) & MAXSIZE
+	#s1 ^= (s1 >> 17)
+	#s1 ^= s0
+	#s1 ^= (s0 >> 26)
+	x = y
+	y = s1
+	generated = (x + y) & MAXSIZE
+	return x, y, generated
+
+
+f1 = open("xorshift128_forward_pass.rng", "w")
+f2 = open("bad.rng", "w")
+# generate COUNT instances of x,y,generated, using x and y as the state for the rng
+fs = [f1, f2]
+rngs = [xorshift128plus, xorinald]
 for i in range(COUNT):
-	nX,nY,generated = xorshift128plus(x,y)
-	f.write(f'{x} {y} {generated}\n')
-	x,y = nX,nY
+	for j in range(2):
+		x = random.randint(0, MAXSIZE)
+		y = random.randint(0, MAXSIZE)
+		_, __, out = rngs[j](x, y)
+		fs[j].write(f'{x} {y} {out}\n')
