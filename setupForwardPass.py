@@ -18,7 +18,7 @@ def xorshift128plus(x, y):
 def xorinald(x, y):
 	s0, s1 = y, x
 	s1 ^= (s1 << 23) & MAXSIZE
-	#s1 ^= (s1 >> 17)
+	s1 ^= (s1 >> 17)
 	#s1 ^= s0
 	#s1 ^= (s0 >> 26)
 	x = y
