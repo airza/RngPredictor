@@ -9,7 +9,7 @@ if torch.backends.mps.is_available():
 else:
     raise "aaaa"
 RNG_NAME = "xorshift128plus"
-IMPORT_COUNT = 4000000
+IMPORT_COUNT = 1000000
 TEST_COUNT = 100
 LOSS_FUNCTION = nn.BCELoss()
 METRIC_FUNCTION = 'accuracy'
