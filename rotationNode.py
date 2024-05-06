@@ -2,31 +2,13 @@ import numpy as np
 import torch.nn as nn
 import torch
 import matplotlib.pyplot as plt
-torch.set_printoptions(precision=4,sci_mode=False)
-mse = nn.MSELoss()
-class rotationNode(nn.Module):
-    def __init__(self,goodWeights=True):
-        super().__init__()
-        self.scale = nn.Parameter(torch.rand(2), requires_grad=True)
-        self.bias = nn.Parameter(torch.rand(1) - 0.5, requires_grad=True)
-        self.w = nn.Parameter(torch.rand(2), requires_grad=True)
-        self.b = nn.Parameter(torch.rand(1) - 0.5, requires_grad=True)
-    def forward(self,x):
-        scaled = torch.sigmoid(self.scale*(x+self.bias))
-        sums = torch.sum(self.w*scaled,dim=-1) + self.b
-        return torch.sin(sums)
-possibilities = torch.tensor(np.array([[1,1],[0,1],[1,0],[0,0]]))
-correctXorNode = rotationNode()
-correctXorNode.scale.data = torch.tensor([100000.00,100000.00])
-correctXorNode.bias.data = torch.tensor([-.5])
-correctXorNode.w.data = torch.tensor([torch.pi/2,torch.pi/2])
-correctXorNode.b.data= torch.tensor([0.0])
+from torch.utils.data import DataLoader, TensorDataset
 
-X = torch.rand(1000000,2)
-Y = correctXorNode(X)
-error = mse(Y,Y)
-learnNode = rotationNode(False)
-def visualize_loss_and_gradient(model, p1_struct,p2_struct, p1_range, p2_range,X,resolution=10):
+torch.set_printoptions(precision=4,sci_mode=False)
+device = torch.device("mps")
+torch.set_default_device(device)
+mse = nn.MSELoss()
+def visualize_loss_and_gradient(model, p1_struct,p2_struct, p1_range, p2_range,X,resolution=50):
     p1_param,p1_index = p1_struct
     p2_param,p2_index = p2_struct
     P1 = np.linspace (p1_range[0], p1_range[1], resolution)
@@ -51,16 +33,57 @@ def visualize_loss_and_gradient(model, p1_struct,p2_struct, p1_range, p2_range,X
             model.zero_grad()
 
     # Plotting the loss surface
-    plt.figure(figsize=(14, 6))
-    plt.subplot(1, 2, 1)
-    plt.contourf(P1, P2, losses, levels=50, cmap='viridis')
-    plt.colorbar()
-    plt.title('Loss surface')
+    plt.figure(figsize=(10, 8))
+    plt.axis('equal')
+    contour = plt.contourf(P1, P2, losses, levels=50, cmap='viridis')
+    plt.colorbar(contour)  # Add a color bar to the contour plot
+    plt.title('Loss Surface with Gradient Field')
 
-    # Plotting the gradients as a quiver plot
-    plt.subplot(1, 2, 2)
-    plt.quiver(X_axis, Y_axis, grads_x, grads_y)
-    plt.title('Gradient field')
+    # Overlay the gradient field as a quiver plot
+    # Use a contrasting color for the arrows, such as white
+    plt.quiver(X_axis, Y_axis, grads_x, grads_y, color='w')
     plt.show()
-visualize_loss_and_gradient(learnNode, [learnNode.w,0],[learnNode.w,1], [0, 1], [0,1],X)
+class rotationNode(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.scale = nn.Parameter(torch.rand(2)*10000)
+        self.bias = nn.Parameter(torch.rand(1) - 1)
+        self.w = nn.Parameter(torch.rand(2)*torch.pi)
+        self.b = nn.Parameter(torch.rand(1) - 0.5)
+    def forward(self,x):
+        scaled = torch.sigmoid(self.scale*(x+self.bias))
+        sums = (torch.sum(self.w*scaled,dim=-1) + self.b)
+        return torch.sin(sums)
+correctXorNode = rotationNode()
+correctXorNode.scale.data = torch.tensor([100000.00,100000.00])
+correctXorNode.bias.data = torch.tensor([-.5])
+correctXorNode.w.data = torch.tensor([torch.pi/2,torch.pi/2])
+correctXorNode.b.data= torch.tensor([0.0])
+
+X = torch.rand(1000,2)
+Y = correctXorNode(X).detach()
+epochs = 200
+train_loader = DataLoader(TensorDataset(X,Y),batch_size=1024)
+model = rotationNode()
+optimizer = torch.optim.NAdam(model.parameters(), lr=0.01, eps=1e-20)
+for epoch in range(epochs):
+    total_loss = 0.0
+    model.train()
+    for batch_X, batch_y in train_loader:
+        optimizer.zero_grad()
+        batch_X = batch_X
+        batch_y = batch_y
+        outputs = model(batch_X)
+        loss = mse(outputs, batch_y)
+        loss.backward()
+        optimizer.step()
+        total_loss += loss.item()
+    print('Epoch:', epoch, 'Loss:', total_loss / len(train_loader))
+    with torch.no_grad():
+        outputs = model(X[:100])
+        loss = mse(outputs, Y[:100])
+        print('Test Loss:', loss.item())
+    if total_loss / len(train_loader) < 0.01:
+        break
+visualize_loss_and_gradient(model, (model.scale,0),(model.scale,1),[0,10000],[0,10000],X)
 exit(0);
