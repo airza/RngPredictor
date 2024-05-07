@@ -5,3 +5,4 @@ __pycache__
 hp_search_*
 .idea
 *.pth
+output
