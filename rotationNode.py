@@ -9,7 +9,7 @@ torch.set_printoptions(precision=4,sci_mode=False)
 device = torch.device("mps")
 torch.set_default_device(device)
 mse = nn.MSELoss()
-def visualize_loss_and_gradient(model, p1_struct,p2_struct, p1_range, p2_range,X,title,resolution=20):
+def visualize_loss_and_gradient(model, p1_struct,p2_struct, p1_range, p2_range,X,title,resolution=30):
     p1_param,p1_index = p1_struct
     p2_param,p2_index = p2_struct
     starting_p1 = p1_param[p1_index].item()
@@ -85,8 +85,13 @@ for epoch in range(epochs):
     total_loss = 0.0
     model.train()
     if epoch % 10 == 0:
-        visualize_loss_and_gradient(model, (model.b, 0), (model.bias, 0), [-torch.pi * 2, torch.pi * 2],
-                                [-torch.pi * 2, torch.pi * 2], X, "before_{0}".format(epoch))
+        b_min = model.b.item() - 1
+        b_max = model.b.item() + 1
+        bias_min = model.bias.item() - 1
+        bias_max = model.bias.item() + 1
+        visualize_loss_and_gradient(model, (model.b, 0), (model.bias, 0), [b_min, b_max], [bias_min, bias_max], X, "before_{0}".format(epoch))
+        visualize_loss_and_gradient(model, (model.b, 0), (model.bias, 0), [b_min*10, b_max*10], [bias_min*10, bias_max*10], X,
+                                "before_{0}_big".format(epoch))
     for batch_X, batch_y in train_loader:
         optimizer.zero_grad()
         batch_X = batch_X
