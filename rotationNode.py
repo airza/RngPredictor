@@ -9,7 +9,7 @@ torch.set_printoptions(precision=4,sci_mode=False)
 device = torch.device("mps")
 torch.set_default_device(device)
 mse = nn.MSELoss()
-def visualize_loss_and_gradient(model, p1_struct,p2_struct, p1_range, p2_range,X,title,resolution=30):
+def visualize_loss_and_gradient(model, p1_struct,p2_struct, p1_range, p2_range,X,title,resolution=30,target_coordinate=None):
     p1_param,p1_index = p1_struct
     p2_param,p2_index = p2_struct
     starting_p1 = p1_param[p1_index].item()
@@ -43,6 +43,8 @@ def visualize_loss_and_gradient(model, p1_struct,p2_struct, p1_range, p2_range,X
     plt.title(title)
     starting_coordinate = (starting_p1, starting_p2)  # Define your starting P1, P2 coordinates
     plt.plot(starting_coordinate[0], starting_coordinate[1], 'ro')  # 'ro' for red circle
+    if target_coordinate is not None:
+        plt.plot(target_coordinate[0], target_coordinate[1], 'go')
     # Overlay the gradient field as a quiver plot
     # Use a contrasting color for the arrows, such as white
     plt.show()
@@ -72,11 +74,12 @@ Y = correctXorNode(X).detach()
 epochs = 200
 train_loader = DataLoader(TensorDataset(X,Y),batch_size=1024)
 model = rotationNode()
-optimizer = torch.optim.SGD(model.parameters(), lr=0.01,momentum=0.9)
+optimizer = torch.optim.NAdam(model.parameters(), lr=0.01, eps=1e-20)
 with torch.no_grad():
     model.scale.data = torch.tensor([1555.7992, 9947.4170])
     model.bias.data = torch.tensor([-0.6989])
-    model.w.data = torch.tensor([0.3230, 0.4581])
+    #model.w.data = torch.tensor([0.3230, 0.4581])
+    model.w.data = torch.tensor([2.5, 0.4581])
     model.b.data = torch.tensor([0.2809])
 for name, param in model.named_parameters():
     print (name, param)
@@ -85,13 +88,10 @@ for epoch in range(epochs):
     total_loss = 0.0
     model.train()
     if epoch % 10 == 0:
-        b_min = model.b.item() - 1
-        b_max = model.b.item() + 1
-        bias_min = model.bias.item() - 1
-        bias_max = model.bias.item() + 1
-        visualize_loss_and_gradient(model, (model.b, 0), (model.bias, 0), [b_min, b_max], [bias_min, bias_max], X, "before_{0}".format(epoch))
-        visualize_loss_and_gradient(model, (model.b, 0), (model.bias, 0), [b_min*10, b_max*10], [bias_min*10, bias_max*10], X,
-                                "before_{0}_big".format(epoch))
+        #visualize_loss_and_gradient(model, (model.b, 0), (model.bias, 0), [b_min*10, b_max*10], [bias_min*10, bias_max*10], X, "before_{0}".format(epoch), target_coordinate=(correctXorNode.b.item(), correctXorNode.bias.item()))
+        visualize_loss_and_gradient(model, (model.w, 0), (model.w, 1), [0, torch.pi],
+                                [0, torch.pi], X, "before_{0}_small".format(epoch),
+                                target_coordinate=(correctXorNode.w[0].item(), correctXorNode.w[0].item()))
     for batch_X, batch_y in train_loader:
         optimizer.zero_grad()
         batch_X = batch_X
@@ -100,10 +100,8 @@ for epoch in range(epochs):
         loss = mse(outputs, batch_y)
         loss.backward()
         optimizer.step()
-        print(model.b.grad)
         total_loss += loss.item()
 with torch.no_grad():
     outputs = model(X[:100])
     loss = mse(outputs, Y[:100])
     print('Test Loss:', loss.item())
-exit(0);
