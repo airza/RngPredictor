@@ -2,13 +2,23 @@
 import numpy as np
 import torch.nn as nn
 import torch
+from torch import pi
 import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader, TensorDataset
-
 torch.set_printoptions(precision=4,sci_mode=False)
 device = torch.device("mps")
 torch.set_default_device(device)
 mse = nn.MSELoss()
+bits = 2
+def a_to_b(thetas):
+    theta = thetas[0]
+    phi = thetas[1]
+    x = torch.sin(theta) * torch.cos(phi)
+    y = torch.sin(theta) * torch.sin(phi)
+    z = torch.cos(theta)
+    return torch.tensor([x,y,z],requires_grad=True)
+
+# Example usage:
 def visualize_loss_and_gradient(model, p1_struct,p2_struct, p1_range, p2_range,X,title,resolution=30,target_coordinate=None):
     p1_param,p1_index = p1_struct
     p2_param,p2_index = p2_struct
@@ -52,46 +62,45 @@ def visualize_loss_and_gradient(model, p1_struct,p2_struct, p1_range, p2_range,X
     with torch.no_grad():
         p1_param[p1_index] = starting_p1
         p2_param[p2_index] = starting_p2
+
+def softmax1(x,dim=1):
+    return torch.exp(x) / (torch.sum(torch.exp(x),dim=dim).unsqueeze(dim))
+
 class rotationNode(nn.Module):
     def __init__(self):
         super().__init__()
-        self.scale = nn.Parameter(torch.rand(2)*10000)
-        self.bias = nn.Parameter(torch.rand(1) - 1)
-        self.w = nn.Parameter(torch.rand(2)*torch.pi)
-        self.b = nn.Parameter(torch.rand(1) - 0.5)
+        self.intro = torch.nn.Linear(bits,2,bias=True)
+        self.w = nn.Parameter(torch.rand(3),requires_grad=True)
+        self.b = nn.Parameter(torch.rand(1),requires_grad=True)
+        self.certainty = nn.Parameter(torch.rand(1),requires_grad=True)
+        # 1024,2 * 4x2  * 4 x 1
     def forward(self,x):
-        scaled = torch.sigmoid(self.scale*(x+self.bias))
-        sums = torch.sum(self.w*scaled,dim=-1) + self.b
-        return torch.sin(sums)
-correctXorNode = rotationNode()
-correctXorNode.scale.data = torch.tensor([100000.00,100000.00])
-correctXorNode.bias.data = torch.tensor([-.5])
-correctXorNode.w.data = torch.tensor([torch.pi/2,torch.pi/2])
-correctXorNode.b.data= torch.tensor([0.0])
-
-X = torch.rand(2000,2)
-Y = correctXorNode(X).detach()
-epochs = 200
-train_loader = DataLoader(TensorDataset(X,Y),batch_size=1024)
+        #x = self.intro(x)
+        #x = 2*x/torch.sum(x,dim=1).unsqueeze(1)
+        sludge = torch.tanh(self.certainty*(x-.5)).unsqueeze(1)
+        target= torch.tensor([[-1,-1],[-1,1],[1,-1],[1,1]]).float().unsqueeze(0)
+        prod = nn.functional.cosine_similarity(sludge,target,dim=2)
+        best_name = torch.softmax(prod,dim=1)
+        xor_outs = torch.tensor([0,1,1,0]).float()
+        and_outs = torch.tensor([0,0,0,1]).float()
+        or_outs = torch.tensor([0,1,1,1]).float()
+        possibilities = torch.stack([xor_outs,and_outs,or_outs])
+        #return blended product of these three
+        mul = torch.matmul(best_name,possibilities.T)
+        boys = torch.matmul(mul,self.w)-self.b
+        return torch.nn.SELU()(boys)
+X = torch.rand(4096*10,bits)
+rounded = torch.round(X)
+Y = torch.logical_xor(rounded[:,0],rounded[:,1]).float()
+epochs = 300
+train_loader = DataLoader(TensorDataset(X,Y),batch_size=4096)
 model = rotationNode()
-optimizer = torch.optim.NAdam(model.parameters(), lr=0.01, eps=1e-20)
-with torch.no_grad():
-    model.scale.data = torch.tensor([1555.7992, 9947.4170])
-    model.bias.data = torch.tensor([-0.6989])
-    #model.w.data = torch.tensor([0.3230, 0.4581])
-    model.w.data = torch.tensor([2.5, 0.4581])
-    model.b.data = torch.tensor([0.2809])
-for name, param in model.named_parameters():
-    print (name, param)
+optimizer = torch.optim.Adam(model.parameters(),lr=.01,eps=1e-20)
+
 
 for epoch in range(epochs):
     total_loss = 0.0
     model.train()
-    if epoch % 10 == 0:
-        #visualize_loss_and_gradient(model, (model.b, 0), (model.bias, 0), [b_min*10, b_max*10], [bias_min*10, bias_max*10], X, "before_{0}".format(epoch), target_coordinate=(correctXorNode.b.item(), correctXorNode.bias.item()))
-        visualize_loss_and_gradient(model, (model.w, 0), (model.w, 1), [0, torch.pi],
-                                [0, torch.pi], X, "before_{0}_small".format(epoch),
-                                target_coordinate=(correctXorNode.w[0].item(), correctXorNode.w[0].item()))
     for batch_X, batch_y in train_loader:
         optimizer.zero_grad()
         batch_X = batch_X
@@ -101,7 +110,12 @@ for epoch in range(epochs):
         loss.backward()
         optimizer.step()
         total_loss += loss.item()
+    if total_loss / len(train_loader) < 0.02:
+        break
+    print(f'Epoch {epoch}, Loss: {total_loss / len(train_loader)}')
 with torch.no_grad():
-    outputs = model(X[:100])
-    loss = mse(outputs, Y[:100])
+    outputs = model(X[:4096])
+    loss = mse(outputs, Y[:4096])
     print('Test Loss:', loss.item())
+    print(outputs[:10],Y[:10])
+    print(model.w)
