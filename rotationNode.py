@@ -70,25 +70,18 @@ class rotationNode(nn.Module):
     def __init__(self):
         super().__init__()
         self.intro = torch.nn.Linear(bits,2,bias=True)
-        self.w = nn.Parameter(torch.rand(3),requires_grad=True)
-        self.b = nn.Parameter(torch.rand(1),requires_grad=True)
+        self.w = nn.Parameter(torch.rand(4),requires_grad=True)
         self.certainty = nn.Parameter(torch.rand(1),requires_grad=True)
         # 1024,2 * 4x2  * 4 x 1
     def forward(self,x):
         #x = self.intro(x)
-        #x = 2*x/torch.sum(x,dim=1).unsqueeze(1)
         sludge = torch.tanh(self.certainty*(x-.5)).unsqueeze(1)
         target= torch.tensor([[-1,-1],[-1,1],[1,-1],[1,1]]).float().unsqueeze(0)
         prod = nn.functional.cosine_similarity(sludge,target,dim=2)
-        best_name = torch.softmax(prod,dim=1)
-        xor_outs = torch.tensor([0,1,1,0]).float()
-        and_outs = torch.tensor([0,0,0,1]).float()
-        or_outs = torch.tensor([0,1,1,1]).float()
-        possibilities = torch.stack([xor_outs,and_outs,or_outs])
+        best_name = torch.softmax(prod*(self.certainty**2),dim=1)
         #return blended product of these three
-        mul = torch.matmul(best_name,possibilities.T)
-        boys = torch.matmul(mul,self.w)-self.b
-        return torch.nn.SELU()(boys)
+        boys = torch.matmul(best_name,torch.torch.relu(self.w))
+        return boys
 X = torch.rand(4096*10,bits)
 rounded = torch.round(X)
 Y = torch.logical_xor(rounded[:,0],rounded[:,1]).float()
