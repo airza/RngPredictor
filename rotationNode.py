@@ -2,14 +2,12 @@
 import numpy as np
 import torch.nn as nn
 import torch
-from torch import pi
 import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader, TensorDataset
-torch.set_printoptions(precision=4,sci_mode=False)
 device = torch.device("mps")
 torch.set_default_device(device)
+bits = 32
 mse = nn.MSELoss()
-bits = 2
 def a_to_b(thetas):
     theta = thetas[0]
     phi = thetas[1]
@@ -37,7 +35,7 @@ def visualize_loss_and_gradient(model, p1_struct,p2_struct, p1_range, p2_range,X
                 p1_param[p1_index] = P1[i]
                 p2_param[p2_index] = P2[j]
             Y_pred = model(X)
-            loss = mse(Y_pred, Y)
+
             loss.backward(retain_graph=True)
             # Store the loss and gradients
             losses[i, j] = loss.item()
@@ -69,26 +67,28 @@ def softmax1(x,dim=1):
 class rotationNode(nn.Module):
     def __init__(self):
         super().__init__()
-        self.intro = torch.nn.Linear(bits,2,bias=True)
+        self.intro = nn.Parameter(torch.rand(bits,2))
         self.w = nn.Parameter(torch.rand(4),requires_grad=True)
-        self.certainty = nn.Parameter(torch.rand(1),requires_grad=True)
+        self.certainty = nn.Parameter(torch.ones(1),requires_grad=True)
         # 1024,2 * 4x2  * 4 x 1
     def forward(self,x):
-        #x = self.intro(x)
-        sludge = torch.tanh(self.certainty*(x-.5)).unsqueeze(1)
-        target= torch.tensor([[-1,-1],[-1,1],[1,-1],[1,1]]).float().unsqueeze(0)
-        prod = nn.functional.cosine_similarity(sludge,target,dim=2)
-        best_name = torch.softmax(prod*(self.certainty**2),dim=1)
+        intro = torch.softmax(self.intro*self.certainty,dim=0)
+        xx = x -0.5
+        xx = torch.matmul(xx,intro)
+        sludge = torch.tanh(xx*self.certainty)
+        target= torch.tensor([[-1,-1],[-1,1],[1,-1],[1,1]]).float().T
+        prod = torch.matmul(sludge,target)
+        best_name = torch.softmax(prod*self.certainty,dim=1)
         #return blended product of these three
-        boys = torch.matmul(best_name,torch.torch.relu(self.w))
-        return boys
-X = torch.rand(4096*10,bits)
+        boys = torch.matmul(best_name,self.w)
+        return torch.sigmoid(boys)
+X = torch.rand(2048,bits)
 rounded = torch.round(X)
 Y = torch.logical_xor(rounded[:,0],rounded[:,1]).float()
-epochs = 300
-train_loader = DataLoader(TensorDataset(X,Y),batch_size=4096)
+epochs = 1000
+train_loader = DataLoader(TensorDataset(X,Y),batch_size=8)
 model = rotationNode()
-optimizer = torch.optim.Adam(model.parameters(),lr=.01,eps=1e-20)
+optimizer = torch.optim.SGD(model.parameters(),lr=1)
 
 
 for epoch in range(epochs):
