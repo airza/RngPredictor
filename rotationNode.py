@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader, TensorDataset
 device = torch.device("mps")
 torch.set_default_device(device)
-bits = 32
+bits = 64
 mse = nn.MSELoss()
 def a_to_b(thetas):
     theta = thetas[0]
@@ -82,11 +82,15 @@ class rotationNode(nn.Module):
         #return blended product of these three
         boys = torch.matmul(best_name,self.w)
         return torch.sigmoid(boys)
-X = torch.rand(2048,bits)
+count = 2048
+test_count = 100
+X = torch.rand(count+test_count,bits)
+X_test, X_train = X[:test_count], X[test_count:]
 rounded = torch.round(X)
-Y = torch.logical_xor(rounded[:,0],rounded[:,1]).float()
+Y = torch.logical_xor(rounded[:,0],rounded[:,6]).float()
+Y_test, Y_train = Y[:test_count], Y[test_count:]
 epochs = 1000
-train_loader = DataLoader(TensorDataset(X,Y),batch_size=8)
+train_loader = DataLoader(TensorDataset(X_train,Y_train),batch_size=8)
 model = rotationNode()
 optimizer = torch.optim.SGD(model.parameters(),lr=1)
 
@@ -106,9 +110,10 @@ for epoch in range(epochs):
     if total_loss / len(train_loader) < 0.02:
         break
     print(f'Epoch {epoch}, Loss: {total_loss / len(train_loader)}')
+    print(model.certainty)
 with torch.no_grad():
-    outputs = model(X[:4096])
-    loss = mse(outputs, Y[:4096])
+    outputs = model(X_test)
+    loss = mse(outputs, Y_test)
     print('Test Loss:', loss.item())
-    print(outputs[:10],Y[:10])
+    print(outputs,Y_test)
     print(model.w)
