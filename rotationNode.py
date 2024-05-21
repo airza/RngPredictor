@@ -6,17 +6,8 @@ import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader, TensorDataset
 device = torch.device("mps")
 torch.set_default_device(device)
-bits = 64
+bits = 4
 mse = nn.MSELoss()
-def a_to_b(thetas):
-    theta = thetas[0]
-    phi = thetas[1]
-    x = torch.sin(theta) * torch.cos(phi)
-    y = torch.sin(theta) * torch.sin(phi)
-    z = torch.cos(theta)
-    return torch.tensor([x,y,z],requires_grad=True)
-
-# Example usage:
 def visualize_loss_and_gradient(model, p1_struct,p2_struct, p1_range, p2_range,X,title,resolution=30,target_coordinate=None):
     p1_param,p1_index = p1_struct
     p2_param,p2_index = p2_struct
@@ -62,12 +53,11 @@ def visualize_loss_and_gradient(model, p1_struct,p2_struct, p1_range, p2_range,X
         p2_param[p2_index] = starting_p2
 
 def softmax1(x,dim=1):
-    return torch.exp(x) / (torch.sum(torch.exp(x),dim=dim).unsqueeze(dim))
-
+    return torch.exp(x) / (1+torch.sum(torch.exp(x),dim=dim)).unsqueeze(1)
 class rotationNode(nn.Module):
-    def __init__(self):
+    def __init__(self,inputBits):
         super().__init__()
-        self.intro = nn.Parameter(torch.rand(bits,2))
+        self.intro = nn.Parameter(torch.rand(inputBits,2))
         self.w = nn.Parameter(torch.rand(4),requires_grad=True)
         self.certainty = nn.Parameter(torch.ones(1),requires_grad=True)
         # 1024,2 * 4x2  * 4 x 1
@@ -82,20 +72,52 @@ class rotationNode(nn.Module):
         #return blended product of these three
         boys = torch.matmul(best_name,self.w)
         return torch.sigmoid(boys)
+
+def make_correct_node(bits,type,position1,position2,certainty=5):
+    activations = {
+        'xor':[0,1,1,0],
+        'and':[0,0,0,1],
+        'or':[0,1,1,1]
+    }[type]
+    activations = [(x-.5)*2 for x in activations]
+    node = rotationNode(bits)
+    r1 = [0 if i != position1 else 2 for i in range(bits)]
+    r2 = [0 if i != position2 else 2 for i in range(bits)]
+    node.intro.data = torch.tensor([r1,r2]).T.float()
+    node.w.data = torch.tensor(activations).float()
+    node.certainty.data = torch.tensor([certainty]).float()
+    return node
+
+
+class multiNode(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.l1 = rotationNode(bits)
+        self.l2 = rotationNode(bits)
+        self.l3 = rotationNode(2)
+    def forward(self,_in):
+        x = self.l1(_in)
+        y = self.l2(_in)
+        return self.l3(torch.stack([x,y],dim=1))
+        # 1024,2 * 4x2  * 4 x 1
 count = 2048
 test_count = 100
+"""
 X = torch.rand(count+test_count,bits)
 X_test, X_train = X[:test_count], X[test_count:]
 rounded = torch.round(X)
-Y = torch.logical_xor(rounded[:,0],rounded[:,6]).float()
+Y_1 = torch.logical_xor(rounded[:,0],rounded[:,1])
+Y_2 = torch.logical_or(rounded[:,2],rounded[:,3])
+Y = torch.logical_and(Y_1,Y_2).float()
 Y_test, Y_train = Y[:test_count], Y[test_count:]
-epochs = 1000
-train_loader = DataLoader(TensorDataset(X_train,Y_train),batch_size=8)
-model = rotationNode()
-optimizer = torch.optim.SGD(model.parameters(),lr=1)
+epochs = 100000
+train_loader = DataLoader(TensorDataset(X_train,Y_train),batch_size=4)
+"""
+model = multiNode()
+optimizer = torch.optim.SGD(model.parameters(),lr=1,momentum=.5,nesterov=True)
 
 
-for epoch in range(epochs):
+"""for epoch in range(epochs):
     total_loss = 0.0
     model.train()
     for batch_X, batch_y in train_loader:
@@ -107,13 +129,31 @@ for epoch in range(epochs):
         loss.backward()
         optimizer.step()
         total_loss += loss.item()
+    print(f'Epoch {epoch}, Loss: {total_loss / len(train_loader)}')
     if total_loss / len(train_loader) < 0.02:
         break
-    print(f'Epoch {epoch}, Loss: {total_loss / len(train_loader)}')
-    print(model.certainty)
-with torch.no_grad():
-    outputs = model(X_test)
-    loss = mse(outputs, Y_test)
-    print('Test Loss:', loss.item())
-    print(outputs,Y_test)
-    print(model.w)
+"""
+model.l1 = make_correct_node(bits,'and',0,1)
+model.l2 = make_correct_node(bits,'xor',2,3)
+model.l3 = make_correct_node(2,'and',0,1)
+model.requires_grad_(False)
+x = torch.rand(1, bits, requires_grad=True)
+print(x.shape)
+x = torch.tensor([.49+i/100 if i != 3 else 1 for i in range(4)]).float().unsqueeze(0).requires_grad_(True)
+print(x.shape)
+y = torch.tensor([1.0])
+print(x.round())
+for i in range(1000):
+    outputs = model(x)
+    loss = mse(outputs,y)
+    loss.backward()
+    print(loss.item())
+    if loss.item() < .1:
+        break
+    with torch.no_grad():
+        print(x.grad)
+        clamp_grad = torch.clamp(x.grad,-.1,.1)
+        x -= clamp_grad
+        torch.clamp(x,0,1,out=x)
+print(x.round())
+print(x)
