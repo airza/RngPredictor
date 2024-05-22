@@ -4,11 +4,6 @@ import matplotlib.pyplot as plt
 torch.set_printoptions(precision=4,sci_mode=False)
 bits = 4
 pos = 2
-def smooth_floor(x,k=2):
-    return x-(torch.sin(2*torch.pi*x)/(2*torch.pi*k))
-def smooth_ceiling(x,k=2):
-    return smooth_floor(x,k) + 1
-
 def gaussian(x, n, k=2, sigma=2):
     return k * torch.exp(-((x - n) ** 2) / (2 * sigma ** 2))
 def smooth_brain(x, n, k=2, sigma=2):
