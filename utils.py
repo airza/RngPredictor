@@ -9,16 +9,36 @@ def smooth_floor(x,k=2):
 def smooth_ceiling(x,k=2):
     return smooth_floor(x,k) + 1
 
+def gaussian(x, n, k=2, sigma=2):
+    return k * torch.exp(-((x - n) ** 2) / (2 * sigma ** 2))
 def smooth_brain(x, n, k=2, sigma=2):
-    return torch.softmax(k * torch.exp(-((x - n) ** 2) / (2 * sigma ** 2)), 0)
-
-eyes = torch.stack([torch.roll(torch.eye(bits), i, 0) for i in range(bits)])
-g = smooth_brain(torch.linspace(0, bits-1, bits), pos, 10, 1)
-print(eyes[pos])
-print(torch.matmul(eyes,g))
+    return torch.softmax(gaussian(x, n, k, sigma), 0)
+def bit_to_minus(n,bits=bits):
+    return n-(bits-1)
+def brange(bits):
+    return range(1-bits,bits)
+def bit_shift_matricies(bits):
+    eyes = torch.stack([torch.roll(torch.eye(bits), i, 0) for i in brange(bits)])
+    for i in range(2 * bits - 1):
+        b = bit_to_minus(i)
+        if b<0:
+            eyes[i][:][b:] = 0.0
+        elif b>=0:
+            eyes[i][:][:b] = 0.0
+    return eyes
+def differentiable_shift(x,n,eyes,certainty,bits=bits):
+    shift = smooth_brain(torch.arange(1-bits,bits,1),n,certainty,1)
+    shift /= shift.sum()
+    mults = torch.sum(shift[:,None,None]*eyes,0)
+    return torch.matmul(x,mults)
+matricies = bit_shift_matricies(bits)
+y = torch.tensor([1,2,3,4]).float()
+print(differentiable_shift(y,1,matricies,10))
 exit(0)
+g = smooth_brain(torch.linspace(0, bits-1, bits), pos, 10, 1)
+prod = torch.matmul(eyes,g)
+print(eyes[pos])
+print(prod)
+print(torch.matmul(prod,y))
 x = torch.linspace(0, 10, 100)
-y = gaussian(x,6,2,2)
-plt.plot(x.cpu(), y.cpu(), label='Smooth Floor')
-plt.legend()
-plt.show()
+exit(0)
