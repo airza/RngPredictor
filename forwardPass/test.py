@@ -2,8 +2,8 @@
 import torch.nn as nn
 import torch
 from torch.utils.data import DataLoader, TensorDataset
-from forwardPass.DifferentiableShiftNode import DifferentiableShiftNode
-
+from forwardPass.DifferentiableShiftNetwork import DifferentiableShiftNetwork
+from forwardPass.LogicGateNode import make_correct_node
 device = torch.device("mps")
 torch.set_default_device(device)
 bits = 4
@@ -20,7 +20,7 @@ Y[:,shift:] = 0.0
 Y_test, Y_train = Y[:test_count], Y[test_count:]
 epochs = 100000
 train_loader = DataLoader(TensorDataset(X_train,Y_train),batch_size=4)
-model = DifferentiableShiftNode(bits,1)
+model = DifferentiableShiftNetwork(bits, 1)
 optimizer = torch.optim.SGD(model.parameters(),lr=1,momentum=.5,nesterov=True)
 for epoch in range(epochs):
     total_loss = 0.0
@@ -35,9 +35,8 @@ for epoch in range(epochs):
         optimizer.step()
         total_loss += loss.item()
     print(f'Epoch {epoch}, Loss: {total_loss / len(train_loader)}')
-    if total_loss / len(train_loader) < 0.02:
+    if total_loss / len(train_loader) < 0.1:
         break
-exit(0)
 model.l1 = make_correct_node(bits, 'and', 0, 1)
 model.l2 = make_correct_node(bits, 'xor', 2, 3)
 model.l3 = make_correct_node(2, 'and', 0, 1)

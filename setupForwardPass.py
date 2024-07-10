@@ -1,7 +1,7 @@
 import random
 
 MAXSIZE = 0xFFFFFFFFFFFFFFFF
-COUNT = 8000000
+COUNT = 4
 
 
 def xorshift128plus(x, y):
@@ -33,8 +33,3 @@ f2 = open("bad.rng", "w")
 # generate COUNT instances of x,y,generated, using x and y as the state for the rng
 fs = [f1, f2]
 rngs = [xorshift128plus]
-for i in range(COUNT):
-	x = random.randint(0, MAXSIZE)
-	y = random.randint(0, MAXSIZE)
-	_, __, out = rngs[0](x, y)
-	fs[i].write(f'{x} {y} {out}\n')
