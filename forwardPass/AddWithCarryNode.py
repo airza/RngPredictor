@@ -8,11 +8,21 @@ def generate_combinations(n):
     return tensor
 
 class AddWithCarryNode(nn.Module):
-    def __init__(self, inputWidth):
+    def __init__(self, inputWidth,useDefault=True):
         super().__init__()
         self.truthTableInputs = generate_combinations(inputWidth)
-        self.truthTableOutputs= torch.randn([2 ** inputWidth, 2 ** inputWidth - 1]).float().T
-        self.certainty = nn.Parameter(torch.ones(1), requires_grad=True)
+        if useDefault:
+            self.truthTableOutputs = torch.tensor([[0,0],
+                                                    [1,0],
+                                                    [1,0],
+                                                    [0,1],
+                                                    [1,0],
+                                                    [0,1],
+                                                    [0,1],
+                                                    [1,1]]).float()
+        else:
+            self.truthTableOutputs= torch.randn([2 ** inputWidth, 2 ** inputWidth - 1]).float().T
+        self.certainty = nn.Parameter(torch.ones(1)*5, requires_grad=True)
     def forward(self, x):
         x = 2*(x - 0.5)
         x = torch.matmul(x, self.truthTableInputs)

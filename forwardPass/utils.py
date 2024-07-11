@@ -7,14 +7,12 @@ def float_bits_to_int(x):
     for bit in x:
         out = (out << 1) | bit
     return out
-y = torch.tensor([.999,.0001,.999,.0001])
 def int_to_bits_tensor(x,width=64):
     out = torch.zeros(width)
     for i in range(width):
         out[width-i-1] = x & 1
         x >>= 1
     return out
-print(float_bits_to_int(y))
 def visualize_loss_and_gradient(model, p1_struct,p2_struct, p1_range, p2_range,X,title,resolution=30,target_coordinate=None):
     p1_param,p1_index = p1_struct
     p2_param,p2_index = p2_struct

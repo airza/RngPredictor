@@ -4,7 +4,6 @@ from AddWithCarryNode import AddWithCarryNode
 import itertools
 torch.set_printoptions(precision=4,sci_mode=False)
 
-
 class AddWithCarryNetwork(nn.Module):
     def __init__(self, inputWidth):
         super().__init__()
@@ -17,32 +16,3 @@ class AddWithCarryNetwork(nn.Module):
             output[:,i] = out[:,0]
             carry = out[:,1]
         return output
-adder = AddWithCarryNode(3)
-activations = [
-    [0, 0, 0],
-    [0, 0, 1],
-    [0, 1, 0],
-    [0, 1, 1],
-    [1, 0, 0],
-    [1, 0, 1],
-    [1, 1, 0],
-    [1, 1, 1]
-]
-outputs = [
-    [0,0],
-    [1,0],
-    [1,0],
-    [0,1],
-    [1,0],
-    [0,1],
-    [0,1],
-    [1,1]
-]
-adder.truthTableInputs = torch.tensor(activations).float().T *2 -1
-adder.truthTableOutputs = torch.tensor(outputs).float()
-adder.certainty.data = torch.tensor([5]).float()
-adderNetwork = AddWithCarryNetwork(3)
-adderNetwork.node = adder
-x = torch.tensor([0,1,1,1,0,1,1,1,1]).float().unsqueeze(0)
-y = torch.tensor([1,0,1,0,0,0,0,0,1]).float().unsqueeze(0)
-print(adderNetwork(x,y))
