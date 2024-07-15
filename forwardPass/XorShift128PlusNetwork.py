@@ -8,9 +8,9 @@ from forwardPass.AddWithCarryNetwork import AddWithCarryNetwork
 class XorShift128NN(nn.Module):
     def __init__(self):
         super().__init__()
-        self.shift1 = DifferentiableShiftNetwork(64,5,23)
-        self.shift2 = DifferentiableShiftNetwork(64,5,-17)
-        self.shift3 = DifferentiableShiftNetwork(64,5,-26)
+        self.shift1 = DifferentiableShiftNetwork(64,3,23)
+        self.shift2 = DifferentiableShiftNetwork(64,3,-17)
+        self.shift3 = DifferentiableShiftNetwork(64,3,-26)
         self.xor = LogicGateNetwork('xor')
         self.adder = AddWithCarryNetwork(3)
     def forward(self,x):

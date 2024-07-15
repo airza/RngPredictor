@@ -2,8 +2,6 @@ import random
 
 MAXSIZE = 0xFFFFFFFFFFFFFFFF
 COUNT = 4
-
-
 def xorshift128plus(x, y):
 	s0, s1 = y, x
 	s1 ^= (s1 << 23) & MAXSIZE
@@ -14,7 +12,7 @@ def xorshift128plus(x, y):
 	y = s1
 	print(oksure(x), oksure(y))
 	generated = (x + y) & MAXSIZE
-	return x, y, generated
+	return generated, x, y,
 
 def xorinald(x, y):
 	s0, s1 = y, x

@@ -22,7 +22,7 @@ class AddWithCarryNode(nn.Module):
                                                     [1,1]]).float()
         else:
             self.truthTableOutputs= torch.randn([2 ** inputWidth, 2 ** inputWidth - 1]).float().T
-        self.certainty = nn.Parameter(torch.ones(1)*5, requires_grad=True)
+        self.certainty = nn.Parameter(torch.ones(1)*2, requires_grad=True)
     def forward(self, x):
         x = 2*(x - 0.5)
         x = torch.matmul(x, self.truthTableInputs)
