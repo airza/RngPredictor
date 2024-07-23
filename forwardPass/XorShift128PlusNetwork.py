@@ -14,6 +14,10 @@ class XorShift128NN(nn.Module):
         self.xor = LogicGateNetwork('xor')
         self.adder = AddWithCarryNetwork(3)
     def forward(self,x):
+        f = 10
+        x *=f
+        x-=(f/2)
+        x = torch.sigmoid(x)
         x, y = x.chunk(2,dim=1)
         n1 = self.shift1(x)
         n2 = self.xor(torch.stack([x,n1],dim=1))
